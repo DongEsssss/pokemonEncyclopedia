@@ -11,6 +11,8 @@ export default function BattlePage() {
   const { playerPokemon, opponentPokemon, resetBattle } = useBattle();
   const [logs, setLogs] = useState<string[]>([]);
   const [battleOver, setBattleOver] = useState(false);
+  const [playerHp, setPlayerHp] = useState<number>(0);
+  const [oppHp, setOppHp] = useState<number>(0);
 
   useEffect(() => {
     if (!playerPokemon || !opponentPokemon) {
@@ -19,8 +21,11 @@ export default function BattlePage() {
     }
 
     // Very simple auto battle logic
-    let playerHp = playerPokemon.stats.find(s => s.stat.name === 'hp')?.base_stat || 50;
-    let oppHp = opponentPokemon.stats.find(s => s.stat.name === 'hp')?.base_stat || 50;
+    let currentPHp = playerPokemon.stats.find(s => s.stat.name === 'hp')?.base_stat || 50;
+    let currentOHp = opponentPokemon.stats.find(s => s.stat.name === 'hp')?.base_stat || 50;
+    
+    setPlayerHp(currentPHp);
+    setOppHp(currentOHp);
     
     const playerAtk = playerPokemon.stats.find(s => s.stat.name === 'attack')?.base_stat || 10;
     const oppAtk = opponentPokemon.stats.find(s => s.stat.name === 'attack')?.base_stat || 10;
@@ -38,15 +43,16 @@ export default function BattlePage() {
       // Delay for effect
       const wait = (ms: number) => new Promise(res => setTimeout(res, ms));
       
-      while (playerHp > 0 && oppHp > 0) {
+      while (currentPHp > 0 && currentOHp > 0) {
         await wait(1000);
         // Player attacks
         const damageToOpp = Math.max(1, Math.floor((playerAtk * 1.5) - oppDef));
-        oppHp -= damageToOpp;
+        currentOHp -= damageToOpp;
+        setOppHp(currentOHp);
         battleLogs.push(t('{{name}} attacks! Dealt {{damage}} damage!', { name: playerPokemon.name, damage: damageToOpp }));
         setLogs([...battleLogs]);
         
-        if (oppHp <= 0) {
+        if (currentOHp <= 0) {
           await wait(1000);
           battleLogs.push(t('Opponent {{name}} fainted! You win!', { name: opponentPokemon.name }));
           setLogs([...battleLogs]);
@@ -56,11 +62,12 @@ export default function BattlePage() {
         await wait(1000);
         // Opponent attacks
         const damageToPlayer = Math.max(1, Math.floor((oppAtk * 1.5) - playerDef));
-        playerHp -= damageToPlayer;
+        currentPHp -= damageToPlayer;
+        setPlayerHp(currentPHp);
         battleLogs.push(t('Opponent {{name}} attacks! Dealt {{damage}} damage!', { name: opponentPokemon.name, damage: damageToPlayer }));
         setLogs([...battleLogs]);
 
-        if (playerHp <= 0) {
+        if (currentPHp <= 0) {
           await wait(1000);
           battleLogs.push(t('{{name}} fainted! You lose!', { name: playerPokemon.name }));
           setLogs([...battleLogs]);
