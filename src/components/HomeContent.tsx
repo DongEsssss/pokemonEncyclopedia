@@ -134,23 +134,23 @@ export default function HomeContent() {
           </div>
 
           {/* 10 Blue Buttons Grid (Region Selectors) */}
-          <div className="grid grid-cols-5 gap-[2px] bg-black border-[4px] border-black p-[2px] rounded mb-8 shadow-md">
+          <div className="grid grid-cols-5 gap-[2px] bg-black border-2 border-black p-[2px] rounded mb-8 shadow-md">
             {regions.map((region) => (
               <button 
                 key={region.id}
                 onClick={() => setSelectedRegion(region)}
                 title={t(region.nameKey)}
-                className={`h-12 sm:h-14 border-2 transition-all flex items-center justify-center text-[10px] sm:text-xs font-bold text-black uppercase overflow-hidden ${
+                className={`h-12 sm:h-14 transition-all flex items-center justify-center text-[10px] sm:text-xs font-bold text-black uppercase overflow-hidden rounded-sm ${
                   selectedRegion.id === region.id 
-                    ? 'bg-[#5CE1E6] border-white z-10 scale-105 shadow-[0_0_8px_#5CE1E6]' 
-                    : 'bg-[#28AAFD] border-black hover:bg-[#5CE1E6]'
+                    ? 'bg-[#5CE1E6] z-10 scale-105 shadow-[0_0_8px_#5CE1E6] ring-2 ring-white' 
+                    : 'bg-[#28AAFD] hover:bg-[#5CE1E6]'
                 }`}
               >
                 {t(region.nameKey).substring(0, 4)}
               </button>
             ))}
             {/* 10th Button (Empty/Decorative) */}
-            <div className="h-12 sm:h-14 bg-[#28AAFD] border-2 border-black flex items-center justify-center">
+            <div className="h-12 sm:h-14 bg-[#28AAFD] flex items-center justify-center rounded-sm">
               <div className="w-2 h-2 rounded-full bg-white opacity-50"></div>
             </div>
           </div>
