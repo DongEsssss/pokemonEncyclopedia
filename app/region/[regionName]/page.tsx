@@ -28,7 +28,7 @@ export default function RegionPage() {
   // --- 상태 관리 ---
   const [entries, setEntries] = useState<PokedexEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [localizedNames, setLocalizedNames] = useState<Record<string, string>>({}); // 그리드용 한글 이름 저장
+  const [localizedNames, setLocalizedNames] = useState<Record<string, string>>({});
 
   const { setPlayerPokemon, setOpponentPokemon, playerMoves, opponentMoves, setPlayerMoves, setOpponentMoves } = useBattle();
   const [selectedPlayer, setSelectedPlayer] = useState<Pokemon | null>(null);
@@ -36,15 +36,15 @@ export default function RegionPage() {
   const [playerSpecies, setPlayerSpecies] = useState<PokemonSpecies | null>(null);
   const [opponentSpecies, setOpponentSpecies] = useState<PokemonSpecies | null>(null);
   
-  const [pokemonCache, setPokemonCache] = useState<Record<string, Pokemon>>({});
-  const [speciesCache, setSpeciesCache] = useState<Record<string, PokemonSpecies>>({});
+  // 도감 디바이스 상세 창 열림 상태
+  const [isP1DeviceOpen, setIsP1DeviceOpen] = useState(false);
+  const [isP2DeviceOpen, setIsP2DeviceOpen] = useState(false);
 
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<'player1' | 'player2' | null>(null);
   const [tempSelectedMoves, setTempSelectedMoves] = useState<MoveDetails[]>([]);
   const [availableMovesDetails, setAvailableMovesDetails] = useState<MoveDetails[]>([]);
   const [isLoadingAvailableMoves, setIsLoadingAvailableMoves] = useState(false);
-  const [isFetchingMoves, setIsFetchingMoves] = useState(false);
   
   const [playerPokedexTab, setPlayerPokedexTab] = useState<'info' | 'moves'>('info');
   const [opponentPokedexTab, setOpponentPokedexTab] = useState<'info' | 'moves'>('info');
@@ -117,7 +117,7 @@ export default function RegionPage() {
   }
 
   const PokedexDevice = ({ pokemon, species, moves, tab, onTabChange, onEdit, onClose, isOpponent }: PokedexDeviceProps) => (
-    <div className={`absolute bottom-full mb-8 ${isOpponent ? 'right-0' : 'left-0'} z-[100] transition-all duration-300 cursor-default`} onClick={e => e.stopPropagation()}>
+    <div className={`absolute bottom-full mb-8 ${isOpponent ? 'right-0' : 'left-0'} z-[100] transition-all duration-300 animate-in slide-in-from-bottom-5 fade-in cursor-default`} onClick={e => e.stopPropagation()}>
       <div className="relative bg-[#DC0A2D] border-[6px] border-black rounded-3xl shadow-[8px_8px_0_0_rgba(0,0,0,0.5)] overflow-hidden flex flex-col w-[300px] sm:w-[380px]">
         <div className="p-4 pb-2 flex items-center justify-between border-b-4 border-black/20">
           <div className="flex items-center gap-3">
@@ -222,12 +222,8 @@ export default function RegionPage() {
     setIsMoveModalOpen(false);
   };
 
-  /**
-   * 그리드용 포켓몬 한글 이름 가져오기
-   */
   const fetchLocalizedNames = async (entries: PokedexEntry[]) => {
     const names: Record<string, string> = {};
-    // 병렬로 species 정보 가져오기 (이미 캐싱되어 있으면 빠름)
     await Promise.all(entries.map(async (entry) => {
       try {
         const species = await getPokemonSpecies(entry.pokemon_species.name);
@@ -244,7 +240,7 @@ export default function RegionPage() {
       try {
         const data = await getPokedexByRegion(regionName);
         setEntries(data);
-        fetchLocalizedNames(data); // 데이터 로드 후 한글 이름 가져오기
+        fetchLocalizedNames(data);
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
     }
@@ -256,18 +252,20 @@ export default function RegionPage() {
     const species = await getPokemonSpecies(entry.pokemon_species.name);
 
     if (selectedPlayer?.name === pkmn.name) {
-      setSelectedPlayer(null); setPlayerPokemon(null); setPlayerMoves([]); return;
+      setSelectedPlayer(null); setPlayerPokemon(null); setPlayerMoves([]); setIsP1DeviceOpen(false); return;
     }
     if (selectedOpponent?.name === pkmn.name) {
-      setSelectedOpponent(null); setOpponentPokemon(null); setOpponentMoves([]); return;
+      setSelectedOpponent(null); setOpponentPokemon(null); setOpponentMoves([]); setIsP2DeviceOpen(false); return;
     }
 
     if (!selectedPlayer) {
       setSelectedPlayer(pkmn); setPlayerPokemon(pkmn); setPlayerSpecies(species);
       getRandomMoves(pkmn.moves, 4).then(setPlayerMoves);
+      setIsP1DeviceOpen(true); // 처음 선택 시 디바이스 열기
     } else if (!selectedOpponent) {
       setSelectedOpponent(pkmn); setOpponentPokemon(pkmn); setOpponentSpecies(species);
       getRandomMoves(pkmn.moves, 4).then(setOpponentMoves);
+      setIsP2DeviceOpen(true); // 처음 선택 시 디바이스 열기
     }
   };
 
@@ -275,7 +273,7 @@ export default function RegionPage() {
     <div className={`min-h-screen ${regionName.toLowerCase() === 'kanto' ? 'bg-green-300' : 'bg-blue-100'}`} style={{ backgroundImage: 'radial-gradient(#00000022 2px, transparent 2px)', backgroundSize: '24px 24px' }}>
       <div className="container mx-auto px-4 py-8 max-w-[1600px]">
         <h1 className="text-2xl sm:text-4xl font-mono uppercase tracking-widest mb-8 text-center text-black" style={{ textShadow: '2px 2px 0px white' }}>{t('Region Pokedex', { region: regionName })}</h1>
-        <div className="w-full pb-48">
+        <div className="w-full pb-64"> {/* 하단바 공간 확보 위해 여백 증가 */}
           {loading ? (
             <p className="text-center font-mono text-xl animate-pulse">{t('Loading Pokedex...')}</p>
           ) : (
@@ -306,9 +304,19 @@ export default function RegionPage() {
         <div className="container mx-auto px-4 py-6 max-w-[1400px] flex justify-between items-center gap-6">
           
           <div className={`flex-1 flex items-center p-4 border-[6px] border-black rounded-xl relative ${selectedPlayer ? 'bg-[#1e3a8a]' : 'bg-[#1e3a8a] border-dashed opacity-80'}`}>
-            {selectedPlayer && <PokedexDevice pokemon={selectedPlayer} species={playerSpecies} moves={playerMoves} tab={playerPokedexTab} onTabChange={setPlayerPokedexTab} onEdit={() => openMoveEditModal('player1')} onClose={() => {setSelectedPlayer(null); setPlayerPokemon(null);}} />}
+            {selectedPlayer && isP1DeviceOpen && (
+              <PokedexDevice 
+                pokemon={selectedPlayer} 
+                species={playerSpecies} 
+                moves={playerMoves} 
+                tab={playerPokedexTab} 
+                onTabChange={setPlayerPokedexTab} 
+                onEdit={() => openMoveEditModal('player1')} 
+                onClose={() => setIsP1DeviceOpen(false)} 
+              />
+            )}
             
-            <div onClick={() => {setSelectedPlayer(null); setPlayerPokemon(null);}} className="w-24 h-24 sm:w-32 sm:h-32 bg-[#98cb98] border-4 border-black rounded-lg flex items-center justify-center relative overflow-hidden shrink-0 shadow-[inset_4px_4px_0_0_rgba(0,0,0,0.2)] cursor-pointer">
+            <div onClick={() => selectedPlayer ? setIsP1DeviceOpen(!isP1DeviceOpen) : null} className={`w-24 h-24 sm:w-32 sm:h-32 bg-[#98cb98] border-4 border-black rounded-lg flex items-center justify-center relative overflow-hidden shrink-0 shadow-[inset_4px_4px_0_0_rgba(0,0,0,0.2)] ${selectedPlayer ? 'cursor-pointer hover:bg-[#a8dbb8]' : ''}`}>
               <div className="absolute inset-0 opacity-10 rounded-sm bg-[linear-gradient(rgba(0,0,0,0.1)_1px,_transparent_1px)] pointer-events-none" style={{ backgroundSize: '100% 4px' }}></div>
               <div key={selectedPlayer?.name || 'empty-p1'} className={`relative w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center z-10 ${selectedPlayer ? 'animate-throw-left' : ''}`}>
                 <div className="absolute inset-0 origin-bottom" style={{ zIndex: selectedPlayer ? 10 : 20, clipPath: 'polygon(0 0, 100% 0, 100% 50%, 0 50%)', animation: selectedPlayer ? 'openTop 0.3s ease-out 0.8s both' : 'none' }}>
@@ -323,19 +331,38 @@ export default function RegionPage() {
                   </div>
                 )}
               </div>
+              {selectedPlayer && !isP1DeviceOpen && (
+                <div className="absolute bottom-1 right-1 bg-white/80 border-2 border-black rounded px-1 animate-bounce">
+                  <span className="text-[8px] font-mono font-black text-black">INFO ▲</span>
+                </div>
+              )}
             </div>
 
-            <div className="ml-6 text-white font-mono">
+            <div className="ml-6 text-white font-mono hidden lg:block">
               <p className="text-xs font-bold opacity-70">PLAYER 1</p>
-              <h3 className="text-2xl font-black uppercase truncate max-w-[200px]">{getLocalizedNameFromSpecies(playerSpecies, selectedPlayer?.name || '') || t('Select P1')}</h3>
+              <h3 className="text-xl font-black uppercase truncate max-w-[150px]">{getLocalizedNameFromSpecies(playerSpecies, selectedPlayer?.name || '') || t('Select P1')}</h3>
             </div>
           </div>
 
-          <button onClick={() => router.push('/battle')} disabled={!selectedPlayer || !selectedOpponent} className="w-32 h-32 bg-yellow-400 border-[8px] border-black rounded-full shadow-[0_6px_0_0_#000] font-mono font-black text-xl sm:text-2xl active:translate-y-1 active:shadow-none disabled:opacity-30 flex items-center justify-center text-center px-2 leading-tight">배틀 시작</button>
+          <div className="flex flex-col items-center gap-2">
+             <button onClick={() => router.push('/battle')} disabled={!selectedPlayer || !selectedOpponent} className="w-24 h-24 sm:w-32 sm:h-32 bg-yellow-400 border-[8px] border-black rounded-full shadow-[0_6px_0_0_#000] font-mono font-black text-xl sm:text-2xl active:translate-y-1 active:shadow-none disabled:opacity-30 flex items-center justify-center text-center px-2 leading-tight transition-all">배틀 시작</button>
+             <button onClick={() => { setSelectedPlayer(null); setSelectedOpponent(null); setPlayerPokemon(null); setOpponentPokemon(null); setIsP1DeviceOpen(false); setIsP2DeviceOpen(false); }} className="text-[10px] font-mono font-bold text-white/50 hover:text-white uppercase tracking-tighter">{t('Reset')}</button>
+          </div>
 
           <div className={`flex-1 flex items-center flex-row-reverse p-4 border-[6px] border-black rounded-xl relative ${selectedOpponent ? 'bg-[#b90020]' : 'bg-[#b90020] border-dashed opacity-80'}`}>
-            {selectedOpponent && <PokedexDevice pokemon={selectedOpponent} species={opponentSpecies} moves={opponentMoves} tab={opponentPokedexTab} onTabChange={setOpponentPokedexTab} onEdit={() => openMoveEditModal('player2')} onClose={() => {setSelectedOpponent(null); setOpponentPokemon(null);}} isOpponent />}
-            <div onClick={() => {setSelectedOpponent(null); setOpponentPokemon(null);}} className="w-24 h-24 sm:w-32 sm:h-32 bg-[#98cb98] border-4 border-black rounded-lg flex items-center justify-center relative overflow-hidden shrink-0 shadow-[inset_4px_4px_0_0_rgba(0,0,0,0.2)] cursor-pointer">
+            {selectedOpponent && isP2DeviceOpen && (
+              <PokedexDevice 
+                pokemon={selectedOpponent} 
+                species={opponentSpecies} 
+                moves={opponentMoves} 
+                tab={opponentPokedexTab} 
+                onTabChange={setOpponentPokedexTab} 
+                onEdit={() => openMoveEditModal('player2')} 
+                onClose={() => setIsP2DeviceOpen(false)} 
+                isOpponent 
+              />
+            )}
+            <div onClick={() => selectedOpponent ? setIsP2DeviceOpen(!isP2DeviceOpen) : null} className={`w-24 h-24 sm:w-32 sm:h-32 bg-[#98cb98] border-4 border-black rounded-lg flex items-center justify-center relative overflow-hidden shrink-0 shadow-[inset_4px_4px_0_0_rgba(0,0,0,0.2)] ${selectedOpponent ? 'cursor-pointer hover:bg-[#a8dbb8]' : ''}`}>
               <div className="absolute inset-0 opacity-10 rounded-sm bg-[linear-gradient(rgba(0,0,0,0.1)_1px,_transparent_1px)] pointer-events-none" style={{ backgroundSize: '100% 4px' }}></div>
               <div key={selectedOpponent?.name || 'empty-p2'} className={`relative w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center z-10 ${selectedOpponent ? 'animate-throw-right' : ''}`}>
                 <div className="absolute inset-0 origin-bottom" style={{ zIndex: selectedOpponent ? 10 : 20, clipPath: 'polygon(0 0, 100% 0, 100% 50%, 0 50%)', animation: selectedOpponent ? 'openTop 0.3s ease-out 0.8s both' : 'none' }}>
@@ -350,10 +377,15 @@ export default function RegionPage() {
                   </div>
                 )}
               </div>
+              {selectedOpponent && !isP2DeviceOpen && (
+                <div className="absolute bottom-1 left-1 bg-white/80 border-2 border-black rounded px-1 animate-bounce">
+                  <span className="text-[8px] font-mono font-black text-black">INFO ▲</span>
+                </div>
+              )}
             </div>
-            <div className="mr-6 text-white font-mono text-right">
+            <div className="mr-6 text-white font-mono text-right hidden lg:block">
               <p className="text-xs font-bold opacity-70">PLAYER 2</p>
-              <h3 className="text-2xl font-black uppercase truncate max-w-[200px]">{getLocalizedNameFromSpecies(opponentSpecies, selectedOpponent?.name || '') || t('Select P2')}</h3>
+              <h3 className="text-xl font-black uppercase truncate max-w-[150px]">{getLocalizedNameFromSpecies(opponentSpecies, selectedOpponent?.name || '') || t('Select P2')}</h3>
             </div>
           </div>
         </div>
