@@ -65,7 +65,8 @@ const resources = {
       "defense": "방어",
       "special-attack": "특수공격",
       "special-defense": "특수방어",
-      "speed": "스피드"
+      "speed": "스피드",
+      "ACCESS": "접속"
     }
   },
   en: {
@@ -130,14 +131,15 @@ const resources = {
       "defense": "DEF",
       "special-attack": "SP.ATK",
       "special-defense": "SP.DEF",
-      "speed": "SPD"
+      "speed": "SPD",
+      "ACCESS": "ACCESS"
     }
   },
   ja: {
     translation: {
       "Battle Arena": "バトルアリーナ",
       "Select a region to choose your Pokemon!": "ポケモンを選ぶ地方を選択してください！",
-      "Pokemon Battle Simulator": "ポケモンバトルシミュレーター",
+      "Pokemon Battle Simulator": "ポケモンバトルシ뮬レーター",
       "Battle Setup": "バトルの準備",
       "Player 1": "プレイヤー 1",
       "Player 2": "プレイヤー 2",
@@ -195,7 +197,8 @@ const resources = {
       "defense": "방어",
       "special-attack": "특수공격",
       "special-defense": "특수방어",
-      "speed": "스피드"
+      "speed": "스피드",
+      "ACCESS": "アクセス"
     }
   }
 };
