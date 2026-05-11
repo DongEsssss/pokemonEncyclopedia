@@ -39,6 +39,8 @@ export interface MoveDetails {
 export interface Pokemon {
   id: number;
   name: string;
+  height: number;
+  weight: number;
   sprites: {
     front_default: string;
     back_default: string;
@@ -61,7 +63,27 @@ export interface Region {
   url: string;
 }
 
+export interface PokemonSpecies {
+  id: number;
+  name: string;
+  flavor_text_entries: {
+    flavor_text: string;
+    language: { name: string };
+    version: { name: string };
+  }[];
+  names: {
+    language: { name: string };
+    name: string;
+  }[];
+}
+
 const API_BASE = 'https://pokeapi.co/api/v2';
+
+export async function getPokemonSpecies(nameOrId: string | number): Promise<PokemonSpecies> {
+  const res = await fetch(`${API_BASE}/pokemon-species/${nameOrId}`);
+  if (!res.ok) throw new Error('Failed to fetch pokemon species details');
+  return await res.json();
+}
 
 export async function getRegions(): Promise<Region[]> {
   const res = await fetch(`${API_BASE}/region`);
