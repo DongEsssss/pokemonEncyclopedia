@@ -1,6 +1,7 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
+// 언어별 번역 리소스 정의
 const resources = {
   ko: {
     translation: {
@@ -50,7 +51,21 @@ const resources = {
       "desc_alola": "썬, 문 시리즈의 무대인 알로라지방은 하와이를 모티브로 한 따뜻한 남국의 군도입니다. 4개의 거대한 자연 섬과 1개의 인공 섬 에테르파라다이스로 이루어져 있으며, 기존의 획일화된 '체육관' 시스템 대신 각 섬의 왕과 캡틴이 부여하는 '섬순례'라는 독특하고 전통적인 시련 문화를 가지고 있습니다. 환경에 맞춰 전혀 다른 모습으로 적응해 진화한 '알로라폼' 포켓몬들과, Z크리스탈을 이용해 화려한 춤과 함께 강력한 위력을 뿜어내는 'Z기술'의 짜릿함을 경험할 수 있습니다.",
       "desc_galar": "소드, 실드 버전의 무대인 가라르지방은 영국을 모티브로 하였으며, 포켓몬 배틀이 단순한 승부를 넘어 열광적인 인기 스포츠이자 거대한 산업으로 자리 잡은 것이 특징입니다. 배틀은 수많은 관중이 환호하는 거대한 스타디움에서 생중계되며, 특정 구역에서는 포켓몬이 웅장하게 거대해지는 신비한 현상인 '다이맥스'와 '거다이맥스'가 발생해 압도적인 스케일의 배틀을 즐길 수 있습니다. 또한 광활하게 펼쳐진 '와일드에리어'에서 날씨에 따라 시시각각 변하는 포켓몬 생태계를 관찰할 수 있습니다.",
       "desc_paldea": "스칼렛, 바이올렛 버전의 무대인 팔데아지방은 이베리아 반도를 모티브로 한 드넓은 미지의 지역입니다. 시리즈 최초로 완벽한 심리스 오픈월드를 도입하여, 정해진 순서나 제약 없이 플레이어가 원하는 방향으로 자유롭게 탐험하며 3가지의 굵직한 스토리를 마음대로 진행할 수 있습니다. 포켓몬이 눈부신 보석처럼 반짝이며 타입이 변하는 '테라스탈' 현상과 함께, 거대한 오렌지/그레이프 아카데미의 학생이 되어 넓은 세계에서 나만의 진짜 보물을 찾는 위대한 과외 수업이 지금 시작됩니다.",
-      "Explore Region": "지방 탐험하기"
+      "Explore Region": "지방 탐험하기",
+      "HT": "키",
+      "WT": "몸무게",
+      "PWR": "위력",
+      "ACC": "명중",
+      "Moveset": "기술배치",
+      "Info": "정보",
+      "Edit": "수정",
+      "Close": "닫기",
+      "hp": "HP",
+      "attack": "공격",
+      "defense": "방어",
+      "special-attack": "특수공격",
+      "special-defense": "특수방어",
+      "speed": "스피드"
     }
   },
   en: {
@@ -101,7 +116,21 @@ const resources = {
       "desc_alola": "A warm tropical archipelago of four islands! Take on the unique Island Challenge and unleash the explosive power of Z-Moves under the sunny skies.",
       "desc_galar": "A region where Pokémon battles are a phenomenal spectator sport! Feel the thrill of Dynamax battles in gigantic stadiums filled with cheering fans.",
       "desc_paldea": "A vast region offering a true open-world adventure! Travel freely across majestic landscapes and discover the sparkling Terastal phenomenon to find your treasure.",
-      "Explore Region": "Explore Region"
+      "Explore Region": "Explore Region",
+      "HT": "HT",
+      "WT": "WT",
+      "PWR": "PWR",
+      "ACC": "ACC",
+      "Moveset": "Moveset",
+      "Info": "Info",
+      "Edit": "Edit",
+      "Close": "Close",
+      "hp": "HP",
+      "attack": "ATK",
+      "defense": "DEF",
+      "special-attack": "SP.ATK",
+      "special-defense": "SP.DEF",
+      "speed": "SPD"
     }
   },
   ja: {
@@ -130,10 +159,10 @@ const resources = {
       "It's not very effective...": "こうかは いまひとつのようだ...",
       "It had no effect!": "こうかがないみたいだ！",
       "Battle Start!": "バトル開始！",
-      "{{name}} used {{move}}!": "{{name}}の {{move}}！",
-      "Dealt {{damage}} damage!": "{{damage}}のダメージを与えた！",
-      "Opponent {{name}} fainted! Player 1 wins!": "{{name}}は倒れた！プレイヤー 1の勝利！",
-      "{{name}} fainted! Player 2 wins!": "{{name}}は倒れた！プレイヤー 2の勝利！",
+      "{{name}} used {{move}}!": "{{name}}의 {{move}}！",
+      "Dealt {{damage}} damage!": "{{damage}}의 데미지를 입혔다!",
+      "Opponent {{name}} fainted! Player 1 wins!": "{{name}}은(는) 쓰러졌다! 플레이어 1 승리!",
+      "{{name}} fainted! Player 2 wins!": "{{name}}은(는) 쓰러졌다! 플레이어 2 승리!",
       "Kanto": "カントー",
       "Johto": "ジョウト",
       "Hoenn": "ホウエン",
@@ -143,26 +172,41 @@ const resources = {
       "Alola": "アローラ",
       "Galar": "ガラル",
       "Paldea": "パルデア",
-      "desc_kanto": "ポケモンの歴史が始まった象徴的なカントー地方！のどかなマサラタウンから始まり、多くのトレーナーがポケモンマスターの夢を育んできました。",
-      "desc_johto": "伝統と歴史が深く息づくジョウト地方！スズのとうやうずまきじまなど、神秘的な伝説が生きる場所で新たな冒険に出発しましょう。",
-      "desc_hoenn": "青い海と大地が織りなす大自然のホウエン地方！火山灰が舞う道や海底洞窟など、ダイナミックな自然環境とひみつきちのロマンが満載です。",
-      "desc_sinnoh": "神話が息づく北のシンオウ地方！テンガンざんを中心とした荘厳な景観の中で、時空を超える壮大な伝説の冒険が待っています。",
-      "desc_unova": "近代的な大都市と多様な文化が融合したイッシュ地方！巨大なビル群と独自の生態系の中で、理想と真実に向かう興味深いストーリーが展開されます。",
-      "desc_kalos": "美と芸術にあふれるファッションの中心地カロス地方！ポケモンとトレーナーの絆が生み出す「メガシンカ」の神秘的な力を体験してください。",
-      "desc_alola": "4つの美しい島からなる南国のアローラ地方！伝統的なジムの代わりに「島めぐり」というユニークな試練と、Zワザの強力なエネルギーがトレーナーを迎えます。",
-      "desc_galar": "ポケモンバトルが熱狂的なスポーツとして定着したガラル地方！巨大なスタジアムの歓声の中、巨大化する「ダイマックス」バトルのスリルを感じてください。",
-      "desc_paldea": "壮大な自然と豊かな資源があふれる広いパルデア地方！決められた道はなく、自由に探索できる真のオープンワールドで自分だけの宝物を見つけましょう。",
-      "Explore Region": "地方を探検する"
+      "desc_kanto": "ポケモンの歴史가 시작된 상징적인 관동지방! 평화로운 태초마을에서 시작해 많은 트레이너들이 포켓몬 마스터의 꿈을 키워왔습니다.",
+      "desc_johto": "전통과 역사가 깊게 숨쉬는 성도지방! 방울탑과 소용돌이섬 등 신비로운 전설이 살아있는 곳에서 새로운 모험을 떠나보세요.",
+      "desc_hoenn": "푸른 바다와 대지가 어우러진 대자연의 호연지방! 화산재가 날리는 길이나 해저 동굴 등 다이나믹한 자연 환경과 비밀기지의 로망이 가득합니다.",
+      "desc_sinnoh": "신화가 살아숨쉬는 북쪽의 신오지방! 천관산을 중심으로 한 장엄한 경관 속에서 시공을 초월하는 장대한 전설의 모험이 기다리고 있습니다.",
+      "desc_unova": "현대적인 대도시와 다양한 문화가 융합된 하나지방! 거대한 빌딩 숲과 독자적인 생태계 속에서 이상과 진실을 향한 흥미진진한 스토리가 전개됩니다.",
+      "desc_kalos": "아름다움과 예술이 넘치는 패션의 중심지 칼로스지방! 포켓몬과 트레이너의 유대가 만들어내는 '메가진화'의 신비로운 힘을 체험해보세요.",
+      "desc_alola": "4개의 아름다운 섬으로 이루어진 남국의 알로라지방! 전통적인 체육관 대신 '섬순례'라는 독특한 시련과 Z기술의 강력한 에너지가 트레이너를 맞이합니다.",
+      "desc_galar": "포켓몬 배틀이 열광적인 스포츠로 자리잡은 가라르지방! 거대한 스타디움의 함성 속에서 거대해지는 '다이맥스' 배틀의 짜릿함을 느껴보세요.",
+      "desc_paldea": "장엄한 자연과 풍부한 자원이 넘쳐나는 넓은 팔데아지방! 정해진 길 없이 자유롭게 탐험할 수 있는 진정한 오픈월드에서 자신만의 보물을 찾아보세요.",
+      "Explore Region": "지방 탐험하기",
+      "HT": "키",
+      "WT": "몸무게",
+      "PWR": "위력",
+      "ACC": "명중",
+      "Moveset": "기술",
+      "Info": "정보",
+      "Edit": "편집",
+      "Close": "닫기",
+      "hp": "HP",
+      "attack": "공격",
+      "defense": "방어",
+      "special-attack": "특수공격",
+      "special-defense": "특수방어",
+      "speed": "스피드"
     }
   }
 };
 
+// i18next 초기화 설정
 i18n
   .use(initReactI18next)
   .init({
     resources,
     lng: "ko", // 기본 언어를 한국어로 설정
-    fallbackLng: "en",
+    fallbackLng: "en", // 번역이 없을 경우 영어로 대체
     interpolation: {
       escapeValue: false // React는 이미 XSS 방어 기능이 있음
     }

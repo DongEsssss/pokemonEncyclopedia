@@ -79,12 +79,14 @@ export interface PokemonSpecies {
 
 const API_BASE = 'https://pokeapi.co/api/v2';
 
+// 포켓몬 종(Species) 정보 가져오기
 export async function getPokemonSpecies(nameOrId: string | number): Promise<PokemonSpecies> {
   const res = await fetch(`${API_BASE}/pokemon-species/${nameOrId}`);
   if (!res.ok) throw new Error('Failed to fetch pokemon species details');
   return await res.json();
 }
 
+// 모든 지역(Region) 목록 가져오기
 export async function getRegions(): Promise<Region[]> {
   const res = await fetch(`${API_BASE}/region`);
   if (!res.ok) throw new Error('Failed to fetch regions');
@@ -92,6 +94,7 @@ export async function getRegions(): Promise<Region[]> {
   return data.results;
 }
 
+// 특정 지역의 도감(Pokedex) 목록 가져오기
 export async function getPokedexByRegion(regionName: string): Promise<PokedexEntry[]> {
   const regionRes = await fetch(`${API_BASE}/region/${regionName}`);
   if (!regionRes.ok) throw new Error('Failed to fetch region details');
@@ -109,20 +112,22 @@ export async function getPokedexByRegion(regionName: string): Promise<PokedexEnt
   return pokedexData.pokemon_entries;
 }
 
+// 포켓몬 상세 정보 가져오기
 export async function getPokemon(nameOrId: string | number): Promise<Pokemon> {
   const res = await fetch(`${API_BASE}/pokemon/${nameOrId}`);
   if (!res.ok) throw new Error('Failed to fetch pokemon details');
   return await res.json();
 }
 
+// 랜덤한 기술 목록 가져오기
 export async function getRandomMoves(movesList: PokemonMove[], count: number = 4): Promise<MoveDetails[]> {
   if (!movesList || movesList.length === 0) return [];
   
   const shuffled = [...movesList].sort(() => 0.5 - Math.random());
   const selectedMoves: MoveDetails[] = [];
   
-  // Batch fetch to speed things up, since sequential fetching of 10-20 moves can be slow.
-  // We'll take first 15 random moves, fetch them in parallel, filter power > 0, then take up to `count`.
+  // 병렬 처리를 통해 속도 향상. 15개의 후보를 뽑아 병렬로 상세 정보를 가져온 후
+  // 위력이 있는 기술들을 우선적으로 필터링하여 반환.
   const candidates = shuffled.slice(0, 15);
   const fetchPromises = candidates.map(async (item) => {
     try {
@@ -145,6 +150,7 @@ export async function getRandomMoves(movesList: PokemonMove[], count: number = 4
     }
   }
   
+  // 위력이 있는 기술이 하나도 없을 경우 '발버둥'을 기본 기술로 제공
   if (selectedMoves.length === 0) {
     selectedMoves.push({
       id: 165,
@@ -160,6 +166,7 @@ export async function getRandomMoves(movesList: PokemonMove[], count: number = 4
   return selectedMoves;
 }
 
+// 기술들의 상세 정보 가져오기
 export async function getMovesDetails(urls: string[]): Promise<MoveDetails[]> {
   if (!urls || urls.length === 0) return [];
 
@@ -179,6 +186,7 @@ export async function getMovesDetails(urls: string[]): Promise<MoveDetails[]> {
   const results = await Promise.all(fetchPromises);
   const validMoves = results.filter((m): m is MoveDetails => m !== null);
   
+  // 유효한 기술이 없을 경우 '발버둥' 추가
   if (validMoves.length === 0) {
     validMoves.push({
       id: 165,
