@@ -28,6 +28,7 @@ export default function RegionPage() {
   // --- 상태 관리 ---
   const [entries, setEntries] = useState<PokedexEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [localizedNames, setLocalizedNames] = useState<Record<string, string>>({}); // 그리드용 한글 이름 저장
 
   const { setPlayerPokemon, setOpponentPokemon, playerMoves, opponentMoves, setPlayerMoves, setOpponentMoves } = useBattle();
   const [selectedPlayer, setSelectedPlayer] = useState<Pokemon | null>(null);
@@ -49,6 +50,15 @@ export default function RegionPage() {
   const [opponentPokedexTab, setOpponentPokedexTab] = useState<'info' | 'moves'>('info');
 
   // --- 현지화 유틸리티 ---
+  const getLocalizedNameFromSpecies = (species: PokemonSpecies | null, defaultName: string) => {
+    if (!species) return defaultName;
+    const lang = i18n.language.startsWith('ko') ? 'ko' : i18n.language.startsWith('ja') ? 'ja' : 'en';
+    const nameObj = species.names.find(n => n.language.name === lang) || 
+                   species.names.find(n => n.language.name === 'ko') || 
+                   species.names.find(n => n.language.name === 'en');
+    return nameObj ? nameObj.name : defaultName;
+  };
+
   const getLocalizedMoveName = (move: MoveDetails) => {
     const lang = i18n.language.startsWith('ko') ? 'ko' : i18n.language.startsWith('ja') ? 'ja' : 'en';
     const nameObj = move.names.find(n => n.language.name === lang) || 
@@ -64,15 +74,6 @@ export default function RegionPage() {
                     move.flavor_text_entries.find(f => f.language.name === 'ko') || 
                     move.flavor_text_entries.find(f => f.language.name === 'en');
     return descObj ? descObj.flavor_text.replace(/[\n\f\r]/g, ' ') : '';
-  };
-
-  const getLocalizedPokemonName = (species: PokemonSpecies | null, defaultName: string) => {
-    if (!species) return defaultName;
-    const lang = i18n.language.startsWith('ko') ? 'ko' : i18n.language.startsWith('ja') ? 'ja' : 'en';
-    const nameObj = species.names.find(n => n.language.name === lang) || 
-                   species.names.find(n => n.language.name === 'ko') || 
-                   species.names.find(n => n.language.name === 'en');
-    return nameObj ? nameObj.name : defaultName;
   };
 
   const getLocalizedPokemonDescription = (species: PokemonSpecies | null) => {
@@ -140,7 +141,7 @@ export default function RegionPage() {
                 <div className="bg-[#98cb98] border-[6px] border-black rounded-xl p-4 flex flex-col items-center justify-center relative shadow-[inset_4px_4px_0_0_rgba(0,0,0,0.2)]">
                   <div className="absolute top-2 right-3 text-[10px] font-mono text-black/40 font-bold">NO. {String(pokemon.id).padStart(3, '0')}</div>
                   <img src={pokemon.sprites.front_default} className="w-32 h-32 drop-shadow-md" style={{ imageRendering: 'pixelated' }} />
-                  <h2 className="font-mono text-black uppercase font-black text-2xl tracking-tighter mt-1">{getLocalizedPokemonName(species, pokemon.name)}</h2>
+                  <h2 className="font-mono text-black uppercase font-black text-2xl tracking-tighter mt-1">{getLocalizedNameFromSpecies(species, pokemon.name)}</h2>
                   <div className="flex gap-2 mt-2">
                     {pokemon.types.map(t => (
                       <span key={t.type.name} className={`text-[10px] px-2 py-0.5 rounded uppercase text-white font-bold border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] ${typeColors[t.type.name] || 'bg-gray-400'}`}>{t.type.name}</span>
@@ -221,11 +222,29 @@ export default function RegionPage() {
     setIsMoveModalOpen(false);
   };
 
+  /**
+   * 그리드용 포켓몬 한글 이름 가져오기
+   */
+  const fetchLocalizedNames = async (entries: PokedexEntry[]) => {
+    const names: Record<string, string> = {};
+    // 병렬로 species 정보 가져오기 (이미 캐싱되어 있으면 빠름)
+    await Promise.all(entries.map(async (entry) => {
+      try {
+        const species = await getPokemonSpecies(entry.pokemon_species.name);
+        names[entry.pokemon_species.name] = getLocalizedNameFromSpecies(species, entry.pokemon_species.name);
+      } catch (e) {
+        names[entry.pokemon_species.name] = entry.pokemon_species.name;
+      }
+    }));
+    setLocalizedNames(names);
+  };
+
   useEffect(() => {
     async function loadRegion() {
       try {
         const data = await getPokedexByRegion(regionName);
         setEntries(data);
+        fetchLocalizedNames(data); // 데이터 로드 후 한글 이름 가져오기
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
     }
@@ -265,12 +284,15 @@ export default function RegionPage() {
                 const id = entry.pokemon_species.url.split('/').filter(Boolean).pop();
                 const isPlayer = selectedPlayer?.name === entry.pokemon_species.name;
                 const isOpponent = selectedOpponent?.name === entry.pokemon_species.name;
+                const displayName = localizedNames[entry.pokemon_species.name] || entry.pokemon_species.name;
+                
                 return (
                   <div key={entry.pokemon_species.name} onClick={() => handleSelect(entry)} className={`p-3 border-4 border-black rounded-2xl cursor-pointer transition-all ${isPlayer ? 'bg-blue-100 ring-4 ring-blue-500 scale-105 shadow-[6px_6px_0_0_#2563eb]' : isOpponent ? 'bg-red-100 ring-4 ring-red-500 scale-105 shadow-[6px_6px_0_0_#dc2626]' : 'bg-white shadow-[4px_4px_0_0_#000] hover:scale-105'}`}>
-                    <div className="bg-gray-100 rounded-xl mb-3 flex justify-center p-2 border-2 border-black">
+                    <div className="bg-gray-100 rounded-xl mb-3 flex justify-center p-2 border-2 border-black relative">
                       <img src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`} className="w-20 h-20" style={{ imageRendering: 'pixelated' }} />
+                      <span className="absolute top-1 right-1 text-[8px] font-mono text-black/40 font-bold">#{id}</span>
                     </div>
-                    <h3 className="text-center font-mono font-bold text-xs uppercase truncate">{entry.pokemon_species.name}</h3>
+                    <h3 className="text-center font-mono font-bold text-[10px] sm:text-xs uppercase truncate px-1" title={displayName}>{displayName}</h3>
                   </div>
                 );
               })}
@@ -283,27 +305,18 @@ export default function RegionPage() {
         <div className="w-full h-2 bg-[#ff6b8b] border-b-4 border-black"></div>
         <div className="container mx-auto px-4 py-6 max-w-[1400px] flex justify-between items-center gap-6">
           
-          {/* P1 슬롯 */}
           <div className={`flex-1 flex items-center p-4 border-[6px] border-black rounded-xl relative ${selectedPlayer ? 'bg-[#1e3a8a]' : 'bg-[#1e3a8a] border-dashed opacity-80'}`}>
             {selectedPlayer && <PokedexDevice pokemon={selectedPlayer} species={playerSpecies} moves={playerMoves} tab={playerPokedexTab} onTabChange={setPlayerPokedexTab} onEdit={() => openMoveEditModal('player1')} onClose={() => {setSelectedPlayer(null); setPlayerPokemon(null);}} />}
             
-            {/* 몬스터볼 던지기 애니메이션이 적용된 영역 */}
-            <div 
-              onClick={() => {setSelectedPlayer(null); setPlayerPokemon(null);}} 
-              className="w-24 h-24 sm:w-32 sm:h-32 bg-[#98cb98] border-4 border-black rounded-lg flex items-center justify-center relative overflow-hidden shrink-0 shadow-[inset_4px_4px_0_0_rgba(0,0,0,0.2)] cursor-pointer"
-            >
+            <div onClick={() => {setSelectedPlayer(null); setPlayerPokemon(null);}} className="w-24 h-24 sm:w-32 sm:h-32 bg-[#98cb98] border-4 border-black rounded-lg flex items-center justify-center relative overflow-hidden shrink-0 shadow-[inset_4px_4px_0_0_rgba(0,0,0,0.2)] cursor-pointer">
               <div className="absolute inset-0 opacity-10 rounded-sm bg-[linear-gradient(rgba(0,0,0,0.1)_1px,_transparent_1px)] pointer-events-none" style={{ backgroundSize: '100% 4px' }}></div>
-              
               <div key={selectedPlayer?.name || 'empty-p1'} className={`relative w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center z-10 ${selectedPlayer ? 'animate-throw-left' : ''}`}>
-                {/* 몬스터볼 상단 */}
                 <div className="absolute inset-0 origin-bottom" style={{ zIndex: selectedPlayer ? 10 : 20, clipPath: 'polygon(0 0, 100% 0, 100% 50%, 0 50%)', animation: selectedPlayer ? 'openTop 0.3s ease-out 0.8s both' : 'none' }}>
                   <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" className="w-full h-full drop-shadow-md" style={{ imageRendering: 'pixelated' }} alt="pokeball top" />
                 </div>
-                {/* 몬스터볼 하단 */}
                 <div className="absolute inset-0 origin-top" style={{ zIndex: 20, clipPath: 'polygon(0 50%, 100% 50%, 100% 100%, 0 100%)', animation: selectedPlayer ? 'openBottom 0.3s ease-out 0.8s both' : 'none' }}>
                   <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" className="w-full h-full drop-shadow-md" style={{ imageRendering: 'pixelated' }} alt="pokeball bottom" />
                 </div>
-
                 {selectedPlayer && (
                   <div className="absolute z-30" style={{ animation: 'popOut 0.4s ease-out 0.9s both', top: '-10px' }}>
                     <img src={selectedPlayer.sprites.front_default} className="w-24 h-24 sm:w-32 sm:h-32 max-w-none object-contain drop-shadow-[4px_4px_0_rgba(0,0,0,0.3)] animate-bounce" style={{ imageRendering: 'pixelated' }} alt="P1 Pokemon" />
@@ -314,22 +327,16 @@ export default function RegionPage() {
 
             <div className="ml-6 text-white font-mono">
               <p className="text-xs font-bold opacity-70">PLAYER 1</p>
-              <h3 className="text-2xl font-black uppercase truncate max-w-[200px]">{getLocalizedPokemonName(playerSpecies, selectedPlayer?.name || '') || t('Select P1')}</h3>
+              <h3 className="text-2xl font-black uppercase truncate max-w-[200px]">{getLocalizedNameFromSpecies(playerSpecies, selectedPlayer?.name || '') || t('Select P1')}</h3>
             </div>
           </div>
 
-          <button onClick={() => router.push('/battle')} disabled={!selectedPlayer || !selectedOpponent} className="w-32 h-32 bg-yellow-400 border-[8px] border-black rounded-full shadow-[0_6px_0_0_#000] font-mono font-black text-3xl active:translate-y-1 active:shadow-none disabled:opacity-30">VS</button>
+          <button onClick={() => router.push('/battle')} disabled={!selectedPlayer || !selectedOpponent} className="w-32 h-32 bg-yellow-400 border-[8px] border-black rounded-full shadow-[0_6px_0_0_#000] font-mono font-black text-xl sm:text-2xl active:translate-y-1 active:shadow-none disabled:opacity-30 flex items-center justify-center text-center px-2 leading-tight">배틀 시작</button>
 
-          {/* P2 슬롯 */}
           <div className={`flex-1 flex items-center flex-row-reverse p-4 border-[6px] border-black rounded-xl relative ${selectedOpponent ? 'bg-[#b90020]' : 'bg-[#b90020] border-dashed opacity-80'}`}>
             {selectedOpponent && <PokedexDevice pokemon={selectedOpponent} species={opponentSpecies} moves={opponentMoves} tab={opponentPokedexTab} onTabChange={setOpponentPokedexTab} onEdit={() => openMoveEditModal('player2')} onClose={() => {setSelectedOpponent(null); setOpponentPokemon(null);}} isOpponent />}
-            
-            <div 
-              onClick={() => {setSelectedOpponent(null); setOpponentPokemon(null);}} 
-              className="w-24 h-24 sm:w-32 sm:h-32 bg-[#98cb98] border-4 border-black rounded-lg flex items-center justify-center relative overflow-hidden shrink-0 shadow-[inset_4px_4px_0_0_rgba(0,0,0,0.2)] cursor-pointer"
-            >
+            <div onClick={() => {setSelectedOpponent(null); setOpponentPokemon(null);}} className="w-24 h-24 sm:w-32 sm:h-32 bg-[#98cb98] border-4 border-black rounded-lg flex items-center justify-center relative overflow-hidden shrink-0 shadow-[inset_4px_4px_0_0_rgba(0,0,0,0.2)] cursor-pointer">
               <div className="absolute inset-0 opacity-10 rounded-sm bg-[linear-gradient(rgba(0,0,0,0.1)_1px,_transparent_1px)] pointer-events-none" style={{ backgroundSize: '100% 4px' }}></div>
-              
               <div key={selectedOpponent?.name || 'empty-p2'} className={`relative w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center z-10 ${selectedOpponent ? 'animate-throw-right' : ''}`}>
                 <div className="absolute inset-0 origin-bottom" style={{ zIndex: selectedOpponent ? 10 : 20, clipPath: 'polygon(0 0, 100% 0, 100% 50%, 0 50%)', animation: selectedOpponent ? 'openTop 0.3s ease-out 0.8s both' : 'none' }}>
                   <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" className="w-full h-full drop-shadow-md" style={{ imageRendering: 'pixelated' }} alt="pokeball top" />
@@ -337,7 +344,6 @@ export default function RegionPage() {
                 <div className="absolute inset-0 origin-top" style={{ zIndex: 20, clipPath: 'polygon(0 50%, 100% 50%, 100% 100%, 0 100%)', animation: selectedOpponent ? 'openBottom 0.3s ease-out 0.8s both' : 'none' }}>
                   <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png" className="w-full h-full drop-shadow-md" style={{ imageRendering: 'pixelated' }} alt="pokeball bottom" />
                 </div>
-
                 {selectedOpponent && (
                   <div className="absolute z-30" style={{ animation: 'popOut 0.4s ease-out 0.9s both', top: '-10px' }}>
                     <img src={selectedOpponent.sprites.front_default} className="w-24 h-24 sm:w-32 sm:h-32 max-w-none object-contain drop-shadow-[4px_4px_0_rgba(0,0,0,0.3)] animate-bounce" style={{ imageRendering: 'pixelated' }} alt="P2 Pokemon" />
@@ -345,13 +351,11 @@ export default function RegionPage() {
                 )}
               </div>
             </div>
-
             <div className="mr-6 text-white font-mono text-right">
               <p className="text-xs font-bold opacity-70">PLAYER 2</p>
-              <h3 className="text-2xl font-black uppercase truncate max-w-[200px]">{getLocalizedPokemonName(opponentSpecies, selectedOpponent?.name || '') || t('Select P2')}</h3>
+              <h3 className="text-2xl font-black uppercase truncate max-w-[200px]">{getLocalizedNameFromSpecies(opponentSpecies, selectedOpponent?.name || '') || t('Select P2')}</h3>
             </div>
           </div>
-
         </div>
       </div>
 
