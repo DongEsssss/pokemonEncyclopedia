@@ -205,7 +205,7 @@ export default function BattlePage() {
            </div>
 
            {/* 상대방 포켓몬 (반응형 크기/위치) */}
-           <div className="absolute top-[5%] right-[5%] sm:top-[10%] sm:right-[10%] flex flex-col items-end gap-2 sm:gap-3 z-10 animate-in slide-in-from-right duration-700">
+           <div className="absolute top-[5%] right-[5%] sm:top-[8%] sm:right-[8%] flex flex-col items-end gap-2 sm:gap-3 z-10 animate-in slide-in-from-right duration-700">
               <div className="bg-[#1a1a1a]/80 backdrop-blur-md border-2 border-white/10 p-2 sm:p-3 rounded-bl-[1.5rem] sm:rounded-bl-[2rem] rounded-tr-lg shadow-2xl min-w-[160px] sm:min-w-[220px] relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-1 bg-red-500/30"></div>
                 <div className="flex justify-between items-end mb-1 sm:mb-2 border-b border-white/5 pb-1">
@@ -221,16 +221,16 @@ export default function BattlePage() {
                 </div>
               </div>
               <div className={`relative transition-all duration-300 ${damageEffect === 'p2' ? 'animate-shake' : ''}`}>
-                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-32 sm:w-48 h-6 sm:h-10 bg-blue-500/10 rounded-[50%] blur-2xl animate-pulse"></div>
-                <img src={opponentPokemon.sprites.front_default} className={`w-32 h-32 sm:w-64 sm:h-64 relative z-10 transition-transform duration-500 ${currentTurn === 'player2' ? 'scale-110 drop-shadow-[0_0_30px_rgba(255,255,255,0.4)]' : 'scale-100 opacity-80'}`} style={{ imageRendering: 'pixelated' }} />
+                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-24 sm:w-40 h-6 sm:h-10 bg-blue-500/10 rounded-[50%] blur-2xl animate-pulse"></div>
+                <img src={opponentPokemon.sprites.front_default} className={`w-28 h-28 sm:w-56 sm:h-56 relative z-10 transition-transform duration-500 ${currentTurn === 'player2' ? 'scale-105 drop-shadow-[0_0_30px_rgba(255,255,255,0.4)]' : 'scale-100 opacity-80'}`} style={{ imageRendering: 'pixelated' }} />
               </div>
            </div>
 
            {/* 플레이어 포켓몬 (반응형 크기/위치) */}
-           <div className="absolute bottom-[8%] left-[5%] sm:bottom-[12%] sm:left-[10%] flex flex-col items-start gap-2 sm:gap-3 z-10 animate-in slide-in-from-left duration-700">
+           <div className="absolute bottom-[5%] left-[5%] sm:bottom-[8%] sm:left-[8%] flex flex-col items-start gap-2 sm:gap-3 z-10 animate-in slide-in-from-left duration-700">
               <div className={`relative transition-all duration-300 ${damageEffect === 'p1' ? 'animate-shake' : ''}`}>
-                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-40 sm:w-56 h-8 sm:h-12 bg-blue-500/10 rounded-[50%] blur-2xl animate-pulse"></div>
-                <img src={playerPokemon.sprites.front_default} className={`w-40 h-40 sm:w-80 sm:h-80 relative z-10 transition-transform duration-500 scale-x-[-1] ${currentTurn === 'player1' ? 'scale-x-[-1.1] scale-y-[1.1] drop-shadow-[0_0_30px_rgba(255,255,255,0.4)]' : 'scale-x-[-1] opacity-80'}`} style={{ imageRendering: 'pixelated' }} />
+                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-32 sm:w-48 h-8 sm:h-12 bg-blue-500/10 rounded-[50%] blur-2xl animate-pulse"></div>
+                <img src={playerPokemon.sprites.front_default} className={`w-32 h-32 sm:w-64 sm:h-64 relative z-10 transition-transform duration-500 scale-x-[-1] ${currentTurn === 'player1' ? 'scale-x-[-1.05] scale-y-[1.05] drop-shadow-[0_0_30px_rgba(255,255,255,0.4)]' : 'scale-x-[-1] opacity-80'}`} style={{ imageRendering: 'pixelated' }} />
               </div>
               <div className="bg-[#1a1a1a]/80 backdrop-blur-md border-2 border-white/10 p-2 sm:p-4 rounded-br-[1.5rem] sm:rounded-br-[2rem] rounded-tl-lg shadow-2xl min-w-[180px] sm:min-w-[250px] relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-1 bg-blue-400/30"></div>

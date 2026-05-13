@@ -211,13 +211,41 @@ export default function RegionPage() {
     const pkmn = await getPokemon(entry.pokemon_species.name);
     const species = await getPokemonSpecies(entry.pokemon_species.name);
 
-    if (selectedPlayer?.name === pkmn.name) {
-      setSelectedPlayer(null); setPlayerPokemon(null); setPlayerMoves([]); return;
-    }
-    if (selectedOpponent?.name === pkmn.name) {
+    const isP1 = selectedPlayer?.name === pkmn.name;
+    const isP2 = selectedOpponent?.name === pkmn.name;
+
+    // 1. 둘 다 선택된 상태라면 P2부터 해제
+    if (isP1 && isP2) {
       setSelectedOpponent(null); setOpponentPokemon(null); setOpponentMoves([]); return;
     }
 
+    // 2. P1만 선택된 상태라면
+    if (isP1) {
+      if (!selectedOpponent) {
+        // P2가 비어있다면 P2도 같은 포켓몬 선택 가능 (중복 허용)
+        setSelectedOpponent(pkmn); setOpponentPokemon(pkmn); setOpponentSpecies(species);
+        getRandomMoves(pkmn.moves, 4).then(setOpponentMoves);
+      } else {
+        // P2가 다른걸 들고 있다면 P1 해제
+        setSelectedPlayer(null); setPlayerPokemon(null); setPlayerMoves([]);
+      }
+      return;
+    }
+
+    // 3. P2만 선택된 상태라면
+    if (isP2) {
+      if (!selectedPlayer) {
+        // P1이 비어있다면 P1도 같은 포켓몬 선택 가능
+        setSelectedPlayer(pkmn); setPlayerPokemon(pkmn); setPlayerSpecies(species);
+        getRandomMoves(pkmn.moves, 4).then(setPlayerMoves);
+      } else {
+        // P1이 다른걸 들고 있다면 P2 해제
+        setSelectedOpponent(null); setOpponentPokemon(null); setOpponentMoves([]);
+      }
+      return;
+    }
+
+    // 4. 아무도 선택하지 않은 상태라면 비어있는 쪽 우선 채움
     if (!selectedPlayer) {
       setSelectedPlayer(pkmn); setPlayerPokemon(pkmn); setPlayerSpecies(species);
       getRandomMoves(pkmn.moves, 4).then(setPlayerMoves);
@@ -226,6 +254,7 @@ export default function RegionPage() {
       getRandomMoves(pkmn.moves, 4).then(setOpponentMoves);
     }
   };
+
 
   const openMoveEditModal = async (playerType: 'player1' | 'player2') => {
     setEditingPlayer(playerType);
@@ -332,13 +361,33 @@ export default function RegionPage() {
                 const displayName = localizedNames[entry.pokemon_species.name] || entry.pokemon_species.name;
                 
                 return (
-                  <div key={entry.pokemon_species.name} onClick={() => handleSelect(entry)} className={`group relative p-0.5 sm:p-1 rounded-xl sm:rounded-2xl cursor-pointer transition-all duration-500 ${isP1 ? 'bg-blue-500 scale-95 shadow-[0_0_20px_#3b82f6]' : isP2 ? 'bg-red-600 scale-95 shadow-[0_0_20px_#dc2626]' : 'bg-white/5 hover:bg-white/10 hover:-translate-y-1 active:scale-95'}`}>
+                  <div 
+                    key={entry.pokemon_species.name} 
+                    onClick={() => handleSelect(entry)} 
+                    className={`group relative p-0.5 sm:p-1 rounded-xl sm:rounded-2xl cursor-pointer transition-all duration-500 
+                      ${isP1 && isP2 
+                        ? 'bg-gradient-to-br from-blue-500 to-red-600 scale-95 shadow-[0_0_20px_rgba(255,255,255,0.3)]' 
+                        : isP1 
+                          ? 'bg-blue-500 scale-95 shadow-[0_0_20px_#3b82f6]' 
+                          : isP2 
+                            ? 'bg-red-600 scale-95 shadow-[0_0_20px_#dc2626]' 
+                            : 'bg-white/5 hover:bg-white/10 hover:-translate-y-1 active:scale-95'
+                      }`}
+                  >
                     <div className="bg-black/30 border-2 border-white/5 rounded-lg sm:rounded-[1.2rem] p-2 sm:p-4 flex flex-col items-center relative overflow-hidden h-full min-h-[100px] sm:min-h-[160px] justify-center">
                       <div className="absolute top-1 right-2 text-[6px] sm:text-[8px] font-mono text-white/10 font-black">#{String(id).padStart(3, '0')}</div>
+                      {/* 선택 표시 (P1/P2 배지) */}
+                      {(isP1 || isP2) && (
+                        <div className="absolute top-1 left-2 flex gap-0.5">
+                          {isP1 && <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-400 shadow-[0_0_5px_#3b82f6]"></div>}
+                          {isP2 && <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-400 shadow-[0_0_5px_#dc2626]"></div>}
+                        </div>
+                      )}
                       <img src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`} className={`w-16 h-16 sm:w-24 sm:h-24 transition-transform duration-500 ${isP1 || isP2 ? 'scale-110 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]' : 'group-hover:scale-125'}`} style={{ imageRendering: 'pixelated' }} />
                       <h3 className={`mt-1 sm:mt-2 font-mono font-black text-[10px] sm:text-sm uppercase truncate w-full text-center tracking-tight transition-colors ${isP1 || isP2 ? 'text-white' : 'text-white/40 group-hover:text-white'}`}>{displayName}</h3>
                     </div>
                   </div>
+
                 );
               })}
             </div>
