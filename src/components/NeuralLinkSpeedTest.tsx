@@ -22,18 +22,21 @@ export default function NeuralLinkSpeedTest({ isOpen, onClose }: NeuralLinkSpeed
     setProgress(0);
     setPing(null);
     setDownloadSpeed(null);
-
+    
+    const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    
     try {
-      // 1. Measure Ping (Latency)
+      // 1. 응답 속도 측정 (Ping)
       const pingStart = performance.now();
       await fetch('https://pokeapi.co/api/v2/pokemon/1', { method: 'HEAD', cache: 'no-store' });
       const pingEnd = performance.now();
       const measuredPing = Math.round(pingEnd - pingStart);
       setPing(measuredPing);
       setProgress(30);
+      await sleep(800); // 핑 분석을 위한 의도적 지연
 
-      // 2. Measure Download Speed
-      // Using official artwork images to get a decent sample
+      // 2. 다운로드 속도 측정
+      // 공식 아트워크 이미지를 활용하여 샘플 데이터 다운로드
       const testFiles = [
         'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/250.png',
         'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/249.png',
@@ -47,17 +50,21 @@ export default function NeuralLinkSpeedTest({ isOpen, onClose }: NeuralLinkSpeed
         const response = await fetch(testFiles[i], { cache: 'no-store' });
         const blob = await response.blob();
         totalSize += blob.size;
-        setProgress(30 + ((i + 1) / testFiles.length) * 70);
+        setProgress(30 + ((i + 1) / testFiles.length) * 60);
+        await sleep(500); // 패킷 간 의도적 지연
       }
-
+      
       const downloadEnd = performance.now();
+      setProgress(95);
+      await sleep(600); // 연결 최종 확인 지연
+      
       const durationSeconds = (downloadEnd - downloadStart) / 1000;
       const speedMbps = (totalSize * 8) / (1024 * 1024) / durationSeconds;
 
       setDownloadSpeed(parseFloat(speedMbps.toFixed(2)));
       setStatus('complete');
     } catch (error) {
-      console.error('Speed test failed:', error);
+      console.error('속도 측정 실패:', error);
       setStatus('complete');
       if (ping === null) setPing(0);
       if (downloadSpeed === null) setDownloadSpeed(0);
@@ -66,23 +73,23 @@ export default function NeuralLinkSpeedTest({ isOpen, onClose }: NeuralLinkSpeed
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      {/* Backdrop */}
+      {/* 배경 오버레이 */}
       <div
         className="absolute inset-0 bg-black/80 backdrop-blur-xl animate-in fade-in duration-500"
         onClick={onClose}
       ></div>
 
-      {/* Modal Content */}
+      {/* 모달 콘텐츠 */}
       <div className="relative w-full max-w-xl bg-[#050a14] border-[6px] border-blue-500/20 rounded-[3rem] shadow-[0_0_80px_rgba(59,130,246,0.25)] overflow-hidden animate-in zoom-in-95 duration-300">
 
-        {/* Holographic Overlays */}
+        {/* 홀로그램 효과 오버레이 */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_-20%,rgba(59,130,246,0.15),transparent_70%)]"></div>
           <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-400 to-transparent animate-pulse"></div>
         </div>
 
-        {/* Header Decor */}
+        {/* 헤더 장식 */}
         <div className="absolute top-0 right-0 p-6 z-20">
           <button
             onClick={onClose}
@@ -94,10 +101,10 @@ export default function NeuralLinkSpeedTest({ isOpen, onClose }: NeuralLinkSpeed
 
         <div className="relative z-10 p-10 sm:p-14 flex flex-col items-center">
 
-          {/* Main Display Area */}
+          {/* 메인 표시 영역 */}
           <div className="mb-12 flex flex-col items-center">
             <div className="relative mb-8">
-              {/* Spinning Ring */}
+              {/* 회전하는 링 장식 */}
               <div className={`absolute -inset-6 border-4 border-dashed border-blue-500/20 rounded-full ${status === 'testing' ? 'animate-[spin_10s_linear_infinite]' : ''}`}></div>
               <div className={`absolute -inset-10 border border-blue-500/10 rounded-full ${status === 'testing' ? 'animate-[spin_20s_linear_infinite_reverse]' : ''}`}></div>
 
@@ -133,13 +140,13 @@ export default function NeuralLinkSpeedTest({ isOpen, onClose }: NeuralLinkSpeed
 
           {status === 'testing' && (
             <div className="w-full flex flex-col items-center animate-in fade-in duration-500">
-              {/* Progress Ring / Gauge would be nice, but simple bar for now */}
+              {/* 진행 바 */}
               <div className="w-full h-3 bg-white/5 rounded-full border border-white/10 overflow-hidden mb-10 relative">
                 <div
                   className="h-full bg-gradient-to-r from-blue-600 to-blue-400 shadow-[0_0_20px_#3b82f6] transition-all duration-300 ease-out"
                   style={{ width: `${progress}%` }}
                 ></div>
-                {/* Glitch effect on bar */}
+                {/* 바 위의 글리치 효과 */}
                 <div className="absolute top-0 bottom-0 w-8 bg-white/30 blur-md animate-[move_1s_infinite]" style={{ left: `${progress}%` }}></div>
               </div>
 
@@ -209,8 +216,8 @@ export default function NeuralLinkSpeedTest({ isOpen, onClose }: NeuralLinkSpeed
             </div>
           )}
         </div>
-
-        {/* Footer info */}
+        
+        {/* 푸터 정보 */}
         <div className="bg-black/80 backdrop-blur-md border-t-2 border-white/5 px-10 py-5 flex justify-between items-center relative overflow-hidden">
           <div className="absolute inset-0 bg-blue-500/5 pointer-events-none"></div>
           <div className="flex gap-4">
