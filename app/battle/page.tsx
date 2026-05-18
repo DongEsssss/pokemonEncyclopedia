@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useBattle } from '@/src/context/BattleContext';
 import { useTranslation } from 'react-i18next';
-import { getRandomMoves, getPokemonSpecies } from '@/src/services/pokeapi';
+import { getRandomMoves, getPokemonSpecies, getFixedMovesDetailsByNames } from '@/src/services/pokeapi';
 import { typeThemes } from '@/src/constants/pokemonData';
 import { getMultiplier, calculateDamage, getStatValue, getHpPercentage, getHpColor } from '@/src/utils/battleUtils';
 import { MoveDetails, PokemonSpecies } from '@/src/types/pokemon';
@@ -119,6 +119,81 @@ export default function BattlePage() {
     const defenderDef = getStatValue(defender, 'defense') || 10;
     const moveName = getLocalizedMoveName(move);
     const attackerName = getLocalizedName(attackerSpecies, attacker.name);
+
+    if (attacker.name === 'magikarp' && move.name === 'splash') {
+      setAttackAnim(isPlayer1 ? 'p1' : 'p2');
+      await wait(200);
+      setLogs(prev => [...prev, t('{{name}} used {{move}}!', { name: attackerName, move: moveName })]);
+      await wait(600);
+      setAttackAnim(null);
+      setLogs(prev => [...prev, t("But nothing happened...")]);
+      await wait(1000);
+
+      // Evolution check: 5% chance
+      if (Math.random() <= 0.05) {
+        setLogs(prev => [...prev, t('What? {{name}} is evolving!', { name: attackerName })]);
+        await wait(1500);
+        
+        setFlashColor('#ffffff');
+        await wait(500);
+        
+        try {
+          const gyaradosRes = await fetch('https://pokeapi.co/api/v2/pokemon/gyarados');
+          const newGyarados = await gyaradosRes.json();
+          const gyaradosSpeciesRes = await fetch('https://pokeapi.co/api/v2/pokemon-species/gyarados');
+          const newGyaradosSpecies = await gyaradosSpeciesRes.json();
+          
+          const isShiny = Math.random() <= 0.1;
+          if (isShiny) {
+             newGyarados.sprites.front_default = newGyarados.sprites.front_shiny;
+          }
+          
+          const evolvedName = getLocalizedName(newGyaradosSpecies, 'gyarados');
+          
+          const newMoves = await getFixedMovesDetailsByNames(['dragon-dance', 'waterfall', 'ice-fang', 'earthquake']);
+          
+          if (isPlayer1) {
+             setPlayerPokemon(newGyarados);
+             setPlayerSpecies(newGyaradosSpecies);
+             setPlayerMoves(newMoves);
+             const currentPHp = newGyarados.stats.find((s: any) => s.stat.name === 'hp')?.base_stat || 95;
+             setPlayerHp(currentPHp * 3);
+          } else {
+             setOpponentPokemon(newGyarados);
+             setOpponentSpecies(newGyaradosSpecies);
+             setOpponentMoves(newMoves);
+             const currentOHp = newGyarados.stats.find((s: any) => s.stat.name === 'hp')?.base_stat || 95;
+             setOppHp(currentOHp * 3);
+          }
+          
+          setFlashColor(null);
+          setLogs(prev => [...prev, t('Congratulations! {{name}} evolved into {{evolvedName}}!', { name: attackerName, evolvedName })]);
+          await wait(1500);
+        } catch (error) {
+          console.error("Evolution failed:", error);
+          setFlashColor(null);
+        }
+      }
+
+      setCurrentTurn(isPlayer1 ? 'player2' : 'player1');
+      setIsProcessing(false);
+      return;
+    }
+
+    if (move.name === 'dragon-dance') {
+      setAttackAnim(isPlayer1 ? 'p1' : 'p2');
+      setFlashColor(typeThemes[move.type.name]?.neon || '#fff');
+      await wait(400);
+      setLogs(prev => [...prev, t('{{name}} used {{move}}!', { name: attackerName, move: moveName })]);
+      await wait(600);
+      setFlashColor(null);
+      setAttackAnim(null);
+      setLogs(prev => [...prev, t("{{name}}'s Attack and Speed rose!", { name: attackerName })]);
+      await wait(1000);
+      setCurrentTurn(isPlayer1 ? 'player2' : 'player1');
+      setIsProcessing(false);
+      return;
+    }
 
     // 공격 타입에 따른 모션 결정
     const physicalTypes = ['normal', 'fighting', 'poison', 'ground', 'rock', 'bug', 'ghost', 'steel', 'flying'];

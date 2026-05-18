@@ -134,11 +134,17 @@ export default function RegionPage() {
       const speciesData = await speciesResponse.json();
       setPlayerSpecies(speciesData);
       
-      const movesPromises = pokemonData.moves.slice(0, 4).map(async (m: any) => {
-        const r = await fetch(m.move.url);
-        return r.json();
-      });
-      const movesData = await Promise.all(movesPromises);
+      let movesData;
+      if (pokemonData.name === 'magikarp') {
+        const r = await fetch('https://pokeapi.co/api/v2/move/splash');
+        movesData = [await r.json()];
+      } else {
+        const movesPromises = pokemonData.moves.slice(0, 4).map(async (m: any) => {
+          const r = await fetch(m.move.url);
+          return r.json();
+        });
+        movesData = await Promise.all(movesPromises);
+      }
       setPlayerMoves(movesData);
       setShowP1Info(true);
     } else if (!selectedOpponent) {
@@ -148,11 +154,17 @@ export default function RegionPage() {
       const speciesData = await speciesResponse.json();
       setOpponentSpecies(speciesData);
       
-      const movesPromises = pokemonData.moves.slice(0, 4).map(async (m: any) => {
-        const r = await fetch(m.move.url);
-        return r.json();
-      });
-      const movesData = await Promise.all(movesPromises);
+      let movesData;
+      if (pokemonData.name === 'magikarp') {
+        const r = await fetch('https://pokeapi.co/api/v2/move/splash');
+        movesData = [await r.json()];
+      } else {
+        const movesPromises = pokemonData.moves.slice(0, 4).map(async (m: any) => {
+          const r = await fetch(m.move.url);
+          return r.json();
+        });
+        movesData = await Promise.all(movesPromises);
+      }
       setOpponentMoves(movesData);
       setShowP2Info(true);
     }

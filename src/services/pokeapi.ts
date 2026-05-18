@@ -132,3 +132,22 @@ export async function getMovesDetails(urls: string[]): Promise<MoveDetails[]> {
   
   return validMoves;
 }
+
+// 특정 이름의 기술 정보들을 가져오기 (고정 스킬셋 등)
+export async function getFixedMovesDetailsByNames(names: string[]): Promise<MoveDetails[]> {
+  const fetchPromises = names.map(async (name) => {
+    try {
+      const res = await fetch(`${API_BASE}/move/${name}`);
+      if (res.ok) {
+        const data: MoveDetails = await res.json();
+        return data;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return null;
+  });
+
+  const results = await Promise.all(fetchPromises);
+  return results.filter((m): m is MoveDetails => m !== null);
+}
