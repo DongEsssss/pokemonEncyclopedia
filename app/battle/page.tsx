@@ -336,7 +336,7 @@ export default function BattlePage() {
       const multiplier = getMultiplier(move.type.name, defender.types.map(t => t.type.name));
       setLastMultiplier(multiplier);
       
-      const damagePerHit = calculateDamage(power, attackerAtk, defenderDef, multiplier, isStab, attackerStatus, isPhysical);
+      let damagePerHit = calculateDamage(power, attackerAtk, defenderDef, multiplier, isStab, attackerStatus, isPhysical);
 
       if (multiplier > 0) {
         if (defenderStatus === 'FRZ' && move.type.name === 'fire') {
@@ -347,6 +347,15 @@ export default function BattlePage() {
         let numHits = 1;
         if (move.meta && move.meta.min_hits && move.meta.max_hits) {
           numHits = Math.floor(Math.random() * (move.meta.max_hits - move.meta.min_hits + 1)) + move.meta.min_hits;
+        }
+
+        if (move.name === 'fury-attack') {
+          numHits = Math.floor(Math.random() * 4) + 1;
+          const base100Damage = calculateDamage(60, attackerAtk, defenderDef, multiplier, isStab, attackerStatus, isPhysical);
+          if (numHits === 1) damagePerHit = Math.max(1, Math.round(base100Damage * 0.40));
+          else if (numHits === 2) damagePerHit = Math.max(1, Math.round(base100Damage * 0.35));
+          else if (numHits === 3) damagePerHit = Math.max(1, Math.round(base100Damage * 0.30));
+          else if (numHits === 4) damagePerHit = Math.max(1, Math.round(base100Damage * 0.25));
         }
 
         if (multiplier > 1) setLogs(prev => [...prev, t("It's super effective!")]);
