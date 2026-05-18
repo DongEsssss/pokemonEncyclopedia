@@ -121,7 +121,8 @@ const resources = {
       "{{name}} is hurt by bad poison!": "{{name}}은(는) 맹독 데미지를 입었다!",
       "{{name}} is afflicted by the curse!": "{{name}}은(는) 저주받고 있다!",
       "{{name}}'s Attack and Speed rose!": "{{name}}의 공격과 스피드가 올라갔다!",
-      "But nothing happened...": "그러나 아무 일도 일어나지 않았다..."
+      "But nothing happened...": "그러나 아무 일도 일어나지 않았다...",
+      "Hit {{count}} times!": "{{count}}번 맞았다!"
     }
   },
   en: {

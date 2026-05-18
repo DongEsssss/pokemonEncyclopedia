@@ -336,41 +336,64 @@ export default function BattlePage() {
       const multiplier = getMultiplier(move.type.name, defender.types.map(t => t.type.name));
       setLastMultiplier(multiplier);
       
-      const damage = calculateDamage(power, attackerAtk, defenderDef, multiplier, isStab, attackerStatus, isPhysical);
+      const damagePerHit = calculateDamage(power, attackerAtk, defenderDef, multiplier, isStab, attackerStatus, isPhysical);
 
       if (multiplier > 0) {
-        setHitFlash(isPlayer1 ? 'p2' : 'p1');
-        setDamageEffect(isPlayer1 ? 'p2' : 'p1');
-        setHitDamage({ value: damage, type: isPlayer1 ? 'p2' : 'p1' });
-
         if (defenderStatus === 'FRZ' && move.type.name === 'fire') {
           setDefenderStatus(null);
           setLogs(prev => [...prev, t('{{name}} thawed out!', { name: defenderName })]);
         }
 
-        if (isPlayer1) {
-          const newHp = Math.max(0, oppHp - damage);
-          setOppHp(newHp);
-          if (multiplier > 1) setLogs(prev => [...prev, t("It's super effective!")]);
-          else if (multiplier < 1) setLogs(prev => [...prev, t("It's not very effective...")]);
-          await wait(600);
-          setLogs(prev => [...prev, t('Dealt {{damage}} damage!', { damage })]);
-          if (newHp <= 0) return handleFaint('p2', defender, defenderSpecies, 'PLAYER 1');
-        } else {
-          const newHp = Math.max(0, playerHp - damage);
-          setPlayerHp(newHp);
-          if (multiplier > 1) setLogs(prev => [...prev, t("It's super effective!")]);
-          else if (multiplier < 1) setLogs(prev => [...prev, t("It's not very effective...")]);
-          await wait(600);
-          setLogs(prev => [...prev, t('Dealt {{damage}} damage!', { damage })]);
-          if (newHp <= 0) return handleFaint('p1', defender, defenderSpecies, 'PLAYER 2');
+        let numHits = 1;
+        if (move.meta && move.meta.min_hits && move.meta.max_hits) {
+          numHits = Math.floor(Math.random() * (move.meta.max_hits - move.meta.min_hits + 1)) + move.meta.min_hits;
         }
 
-        await wait(200);
-        setHitFlash(null);
-        await wait(200);
-        setDamageEffect(null);
-        setTimeout(() => setHitDamage(null), 800);
+        if (multiplier > 1) setLogs(prev => [...prev, t("It's super effective!")]);
+        else if (multiplier < 1) setLogs(prev => [...prev, t("It's not very effective...")]);
+        if (multiplier !== 1) await wait(600);
+
+        let currentDefenderHp = isPlayer1 ? oppHp : playerHp;
+        let totalDamage = 0;
+
+        for (let i = 0; i < numHits; i++) {
+          setAttackAnim(isPlayer1 ? 'p1' : 'p2');
+          await wait(150);
+          
+          setHitFlash(isPlayer1 ? 'p2' : 'p1');
+          setDamageEffect(isPlayer1 ? 'p2' : 'p1');
+          setHitDamage({ value: damagePerHit, type: isPlayer1 ? 'p2' : 'p1' });
+
+          currentDefenderHp = Math.max(0, currentDefenderHp - damagePerHit);
+          totalDamage += damagePerHit;
+          
+          if (isPlayer1) setOppHp(currentDefenderHp);
+          else setPlayerHp(currentDefenderHp);
+
+          await wait(150);
+          setHitFlash(null);
+          setAttackAnim(null);
+          
+          await wait(100);
+          setDamageEffect(null);
+          setTimeout(() => setHitDamage(null), 400);
+
+          if (currentDefenderHp <= 0) break;
+          if (i < numHits - 1) await wait(250);
+        }
+
+        let finalDamage = Math.round(totalDamage);
+        setLogs(prev => [...prev, t('Dealt {{damage}} damage!', { damage: finalDamage })]);
+        if (numHits > 1) {
+          await wait(600);
+          setLogs(prev => [...prev, t('Hit {{count}} times!', { count: numHits })]);
+        }
+
+        await wait(600);
+
+        if (currentDefenderHp <= 0) {
+           return handleFaint(isPlayer1 ? 'p2' : 'p1', defender, defenderSpecies, isPlayer1 ? 'PLAYER 1' : 'PLAYER 2');
+        }
         
         // Attack Secondary Effects (Probabilities)
         const applyEffect = async (status: MajorStatus, msg: string, applyCheck: boolean) => {

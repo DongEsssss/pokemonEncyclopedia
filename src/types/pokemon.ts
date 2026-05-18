@@ -34,6 +34,13 @@ export interface MoveDetails {
     flavor_text: string;
     language: { name: string };
   }[];
+  meta?: {
+    min_hits?: number | null;
+    max_hits?: number | null;
+  };
+  damage_class?: {
+    name: string;
+  };
 }
 
 export interface Pokemon {
