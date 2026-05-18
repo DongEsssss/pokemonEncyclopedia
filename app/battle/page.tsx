@@ -14,7 +14,7 @@ import { Turn, MajorStatus, VolatileStatus } from '@/src/types/battle';
 export default function BattlePage() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
-  const { playerPokemon, opponentPokemon, playerMoves: contextPlayerMoves, opponentMoves: contextOpponentMoves, resetBattle } = useBattle();
+  const { playerPokemon, opponentPokemon, setPlayerPokemon, setOpponentPokemon, playerMoves: contextPlayerMoves, opponentMoves: contextOpponentMoves, resetBattle } = useBattle();
 
   const [logs, setLogs] = useState<string[]>([]);
   const [battleOver, setBattleOver] = useState(false);
@@ -43,6 +43,8 @@ export default function BattlePage() {
   const [oppVolatile, setOppVolatile] = useState<VolatileStatus>({ confusionTurns: 0, flinch: false, infatuation: false, curse: false, sleepTurns: 0, toxTurns: 0 });
   const [fainting, setFainting] = useState<'p1' | 'p2' | null>(null);
   const [winner, setWinner] = useState<{ player: string; pokemon: string } | null>(null);
+  
+  const hasInitialized = useRef(false);
 
 
   const logBoxRef = useRef<HTMLDivElement>(null);
@@ -54,10 +56,13 @@ export default function BattlePage() {
   }, [logs]);
 
   useEffect(() => {
+    if (hasInitialized.current) return;
     if (!playerPokemon || !opponentPokemon) {
       router.push('/');
       return;
     }
+    
+    hasInitialized.current = true;
 
     const initBattle = async () => {
       let currentPHp = playerPokemon.stats.find(s => s.stat.name === 'hp')?.base_stat || 50;
@@ -257,10 +262,9 @@ export default function BattlePage() {
       setLogs(prev => [...prev, t('{{name}} used {{move}}!', { name: attackerName, move: moveName })]);
       await wait(600);
       setAttackAnim(null);
-      setLogs(prev => [...prev, t("But nothing happened...")]);
-      await wait(1000);
 
-      if (Math.random() <= 1.00) {
+      const isEvolving = Math.random() <= 0.10;
+      if (isEvolving) {
         setLogs(prev => [...prev, t('What? {{name}} is evolving!', { name: attackerName })]);
         await wait(1500);
         setFlashColor('#ffffff');
@@ -270,7 +274,15 @@ export default function BattlePage() {
           const newGyarados = await gyaradosRes.json();
           const gyaradosSpeciesRes = await fetch('https://pokeapi.co/api/v2/pokemon-species/gyarados');
           const newGyaradosSpecies = await gyaradosSpeciesRes.json();
-          if (Math.random() <= 0.1) newGyarados.sprites.front_default = newGyarados.sprites.front_shiny;
+          const isShiny = Math.random() <= 0.05;
+          if (isShiny) {
+            newGyarados.sprites.front_default = newGyarados.sprites.front_shiny;
+            newGyaradosSpecies.names.forEach((n: any) => {
+              if (n.language.name === 'ko') n.name = '붉은 갸라도스';
+              else if (n.language.name === 'en') n.name = 'Red Gyarados';
+              else if (n.language.name === 'ja' || n.language.name === 'ja-Hrkt') n.name = 'あかいギャラドス';
+            });
+          }
           const evolvedName = getLocalizedName(newGyaradosSpecies, 'gyarados');
           const newMoves = await getFixedMovesDetailsByNames(['dragon-dance', 'waterfall', 'ice-fang', 'earthquake']);
           if (isPlayer1) {
@@ -284,6 +296,9 @@ export default function BattlePage() {
           setLogs(prev => [...prev, t('Congratulations! {{name}} evolved into {{evolvedName}}!', { name: attackerName, evolvedName })]);
           await wait(1500);
         } catch (error) { setFlashColor(null); }
+      } else {
+        setLogs(prev => [...prev, t("But nothing happened...")]);
+        await wait(1000);
       }
       return endTurn();
     }
