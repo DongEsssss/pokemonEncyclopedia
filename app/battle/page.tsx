@@ -6,9 +6,9 @@ import { useBattle } from '@/src/context/BattleContext';
 import { useTranslation } from 'react-i18next';
 import { getRandomMoves, getPokemonSpecies, getFixedMovesDetailsByNames } from '@/src/services/pokeapi';
 import { typeThemes } from '@/src/constants/pokemonData';
-import { getMultiplier, calculateDamage, getStatValue, getHpPercentage, getHpColor } from '@/src/utils/battleUtils';
+import { getMultiplier, calculateDamage, getStatValue, getHpPercentage, getHpColor, getModifiedStat } from '@/src/utils/battleUtils';
 import { MoveDetails, PokemonSpecies } from '@/src/types/pokemon';
-import { Turn, MajorStatus, VolatileStatus } from '@/src/types/battle';
+import { Turn, MajorStatus, VolatileStatus, StatStages } from '@/src/types/battle';
 
 
 export default function BattlePage() {
@@ -41,6 +41,11 @@ export default function BattlePage() {
   const [oppStatus, setOppStatus] = useState<MajorStatus>(null);
   const [playerVolatile, setPlayerVolatile] = useState<VolatileStatus>({ confusionTurns: 0, flinch: false, infatuation: false, curse: false, sleepTurns: 0, toxTurns: 0 });
   const [oppVolatile, setOppVolatile] = useState<VolatileStatus>({ confusionTurns: 0, flinch: false, infatuation: false, curse: false, sleepTurns: 0, toxTurns: 0 });
+  
+  const defaultStages: StatStages = { attack: 0, defense: 0, specialAttack: 0, specialDefense: 0, speed: 0 };
+  const [playerStatStages, setPlayerStatStages] = useState<StatStages>(defaultStages);
+  const [oppStatStages, setOppStatStages] = useState<StatStages>(defaultStages);
+
   const [fainting, setFainting] = useState<'p1' | 'p2' | null>(null);
   const [winner, setWinner] = useState<{ player: string; pokemon: string } | null>(null);
   
@@ -122,8 +127,20 @@ export default function BattlePage() {
     const defender = isPlayer1 ? opponentPokemon! : playerPokemon!;
     const attackerSpecies = isPlayer1 ? playerSpecies : opponentSpecies;
     const defenderSpecies = isPlayer1 ? opponentSpecies : playerSpecies;
-    const attackerAtk = getStatValue(attacker, 'attack') || 10;
-    const defenderDef = getStatValue(defender, 'defense') || 10;
+    const attackerStatStages = isPlayer1 ? playerStatStages : oppStatStages;
+    const defenderStatStages = isPlayer1 ? oppStatStages : playerStatStages;
+    const setAttackerStatStages = isPlayer1 ? setPlayerStatStages : setOppStatStages;
+
+    // Determine move category (Status vs Attack)
+    const isStatusMove = move.power === null || move.power === 0 || move.damage_class?.name === 'status';
+    const physicalTypes = ['normal', 'fighting', 'poison', 'ground', 'rock', 'bug', 'ghost', 'steel', 'flying'];
+    const isPhysical = move.damage_class?.name === 'physical' || physicalTypes.includes(move.type.name);
+
+    const baseAttackerAtk = getStatValue(attacker, isPhysical ? 'attack' : 'special-attack') || 10;
+    const baseDefenderDef = getStatValue(defender, isPhysical ? 'defense' : 'special-defense') || 10;
+    
+    const attackerAtk = getModifiedStat(baseAttackerAtk, isPhysical ? attackerStatStages.attack : attackerStatStages.specialAttack);
+    const defenderDef = getModifiedStat(baseDefenderDef, isPhysical ? defenderStatStages.defense : defenderStatStages.specialDefense);
     const moveName = getLocalizedMoveName(move);
     const attackerName = getLocalizedName(attackerSpecies, attacker.name);
     const defenderName = getLocalizedName(defenderSpecies, defender.name);
@@ -310,15 +327,18 @@ export default function BattlePage() {
       setLogs(prev => [...prev, t('{{name}} used {{move}}!', { name: attackerName, move: moveName })]);
       await wait(600);
       setFlashColor(null); setAttackAnim(null);
+      
+      setAttackerStatStages(prev => ({
+        ...prev,
+        attack: Math.min(6, prev.attack + 1),
+        speed: Math.min(6, prev.speed + 1)
+      }));
+
       setLogs(prev => [...prev, t("{{name}}'s Attack and Speed rose!", { name: attackerName })]);
       await wait(1000);
       return endTurn();
     }
 
-    // Determine move category (Status vs Attack)
-    const isStatusMove = move.power === null || move.power === 0 || move.damage_class?.name === 'status';
-    const physicalTypes = ['normal', 'fighting', 'poison', 'ground', 'rock', 'bug', 'ghost', 'steel', 'flying'];
-    const isPhysical = move.damage_class?.name === 'physical' || physicalTypes.includes(move.type.name);
     setMotionType(isPhysical ? 'physical' : 'special');
 
     // Attack Animation

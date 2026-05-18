@@ -53,6 +53,23 @@ export const getStatValue = (pokemon: any, statName: string) =>
   pokemon?.stats?.find((s: any) => s.stat.name === statName)?.base_stat || 0;
 
 /**
+ * 랭크(Stage) 변화가 적용된 스탯 값을 계산합니다.
+ * @param baseStat 기본 스탯 값
+ * @param stage 스탯 변화 랭크 (-6 ~ +6)
+ * @returns 랭크가 적용된 스탯 값
+ */
+export const getModifiedStat = (baseStat: number, stage: number) => {
+  if (stage === 0) return baseStat;
+  
+  // 회피율이나 명중률은 계산식이 다르지만, 일반적인 스탯(공격, 방어, 특공, 특방, 스피드)은 이 방식을 사용합니다.
+  const multiplier = stage > 0 
+    ? (2 + stage) / 2 
+    : 2 / (2 - stage); // 음수일 경우 stage 자체가 음수이므로 (2 - (-stage)) => (2 - stage) -> wait, if stage is -1, it's 2 / (2 - (-1)) = 2 / 3. So it should be (2 + Math.abs(stage)).
+    
+  return Math.max(1, Math.floor(baseStat * (stage > 0 ? (2 + stage) / 2 : 2 / (2 + Math.abs(stage)))));
+};
+
+/**
  * HP 퍼센트를 계산합니다.
  */
 export const getHpPercentage = (currentHp: number, maxHp: number) =>

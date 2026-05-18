@@ -12,6 +12,14 @@ export interface VolatileStatus {
   toxTurns: number;
 }
 
+export interface StatStages {
+  attack: number;
+  defense: number;
+  specialAttack: number;
+  specialDefense: number;
+  speed: number;
+}
+
 export interface BattleState {
   logs: string[];
   battleOver: boolean;
