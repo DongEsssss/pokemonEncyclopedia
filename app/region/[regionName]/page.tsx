@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { typeThemes } from '@/src/constants/pokemon';
 import PokedexSidePanel from '@/src/components/PokedexSidePanel';
 import MoveEditModal from '@/src/components/MoveEditModal';
+import { useBattle } from '@/src/context/BattleContext';
 
 interface PokemonSpecies {
   name: string;
@@ -33,6 +34,13 @@ export default function RegionPage() {
   const params = useParams();
   const router = useRouter();
   const regionName = (params.regionName as string).toLowerCase();
+
+  const { 
+    setPlayerPokemon: setContextPlayerPokemon, 
+    setOpponentPokemon: setContextOpponentPokemon, 
+    setPlayerMoves: setContextPlayerMoves, 
+    setOpponentMoves: setContextOpponentMoves 
+  } = useBattle();
 
   const [entries, setEntries] = useState<PokedexEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -204,7 +212,7 @@ export default function RegionPage() {
 
       <header className="shrink-0 h-16 sm:h-20 px-4 sm:px-10 flex items-center justify-between border-b border-white/5 bg-black/20 backdrop-blur-3xl relative z-[60]">
         <div className="flex items-center gap-6">
-          <div onClick={() => router.push('/')} className="cursor-pointer group flex items-center gap-4">
+          <div onClick={() => router.back()} className="cursor-pointer group flex items-center gap-4">
             <div className="w-9 h-9 bg-red-600/80 border border-white/20 rounded-xl shadow-xl group-hover:scale-110 transition-all flex items-center justify-center text-white relative overflow-hidden">
               <svg className="w-4 h-4 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
             </div>
@@ -340,9 +348,15 @@ export default function RegionPage() {
               </div>
             </div>
           </div>
-          <button onClick={() => router.push('/battle')} disabled={!selectedPlayer || !selectedOpponent} className="group relative px-8 py-3 bg-yellow-400 border-[4px] border-black rounded-[1.5rem] shadow-xl hover:-translate-y-1 active:translate-y-0.5 disabled:opacity-20 transition-all overflow-hidden flex-shrink-0">
+          <button onClick={() => {
+            setContextPlayerPokemon(playerPokemon);
+            setContextOpponentPokemon(opponentPokemon);
+            setContextPlayerMoves(playerMoves);
+            setContextOpponentMoves(opponentMoves);
+            router.push('/battle');
+          }} disabled={!selectedPlayer || !selectedOpponent} className="group relative px-8 py-3 bg-yellow-400 border-[4px] border-black rounded-[1.5rem] shadow-xl hover:-translate-y-1 active:translate-y-0.5 disabled:opacity-20 transition-all overflow-hidden flex-shrink-0">
             <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform"></div>
-            <span className="relative z-10 text-lg font-mono font-black text-black uppercase italic tracking-tighter">{t('Initiate')}</span>
+            <span className="relative z-10 text-lg font-mono font-black text-black uppercase italic tracking-tighter">{t('Battle')}</span>
           </button>
         </div>
       </footer>
