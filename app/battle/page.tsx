@@ -14,7 +14,15 @@ import { Turn, MajorStatus, VolatileStatus, StatStages } from '@/src/types/battl
 export default function BattlePage() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
-  const { playerPokemon, opponentPokemon, setPlayerPokemon, setOpponentPokemon, playerMoves: contextPlayerMoves, opponentMoves: contextOpponentMoves, resetBattle } = useBattle();
+  const { 
+    playerPokemon, opponentPokemon, setPlayerPokemon, setOpponentPokemon, 
+    playerMoves: contextPlayerMoves, opponentMoves: contextOpponentMoves, 
+    playerTeam, opponentTeam, playerTeamMoves, opponentTeamMoves,
+    isTournament, tournamentMatches, setTournamentMatches,
+    resetBattle 
+  } = useBattle();
+  const [activePlayerIdx, setActivePlayerIdx] = useState(0);
+  const [activeOpponentIdx, setActiveOpponentIdx] = useState(0);
 
   const [logs, setLogs] = useState<{ text: string, type: 'p1' | 'p2' | 'sys' }[]>([]);
   const [battleOver, setBattleOver] = useState(false);
@@ -613,9 +621,26 @@ export default function BattlePage() {
   };
 
   if (!playerPokemon || !opponentPokemon) return null;
-
-  const maxPlayerHp = (getStatValue(playerPokemon, 'hp') || 50) * 3;
+const maxPlayerHp = (getStatValue(playerPokemon, 'hp') || 50) * 3;
   const maxOppHp = (getStatValue(opponentPokemon, 'hp') || 50) * 3;
+
+  const getHpPercentage = (hp: number, maxHp: number) => Math.max(0, Math.min(100, (hp / maxHp) * 100));
+
+  const getHpColor = (percentage: number) => {
+    if (percentage > 50) return 'bg-green-500';
+    if (percentage > 20) return 'bg-yellow-400';
+    return 'bg-red-500';
+  };
+
+  const TeamIcons = ({ team, activeIdx, isPlayer }: { team: any[], activeIdx: number, isPlayer: boolean }) => (
+    <div className={`flex gap-1 absolute top-2 ${isPlayer ? 'left-2' : 'right-2'} z-50`}>
+      {team?.map((p, i) => (
+        <div key={i} className={`w-8 h-8 rounded-full border-2 ${i === activeIdx ? 'border-yellow-400 bg-white/20' : 'border-white/20 bg-black/40'} flex items-center justify-center overflow-hidden`}>
+          <img src={p.sprites.front_default} className={`w-10 h-10 max-w-none ${i < activeIdx ? 'grayscale opacity-50' : ''}`} style={{ imageRendering: 'pixelated' }} />
+        </div>
+      ))}
+    </div>
+  );
 
   const activeMoves = currentTurn === 'player1' ? playerMoves : opponentMoves;
   const activePlayerName = currentTurn === 'player1' ? 'PLAYER 1' : 'PLAYER 2';
@@ -701,6 +726,8 @@ export default function BattlePage() {
 
         <div className="flex-1 relative bg-black/40 border-[4px] sm:border-[6px] border-black rounded-[1.5rem] sm:rounded-[3rem] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.5)]">
           <div className="absolute inset-0 bg-[#0a0a1a] overflow-hidden">
+            {playerTeam && playerTeam.length > 1 && <TeamIcons team={playerTeam} activeIdx={activePlayerIdx} isPlayer={true} />}
+            {opponentTeam && opponentTeam.length > 1 && <TeamIcons team={opponentTeam} activeIdx={activeOpponentIdx} isPlayer={false} />}
             <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, #1e3a8a 0%, transparent 80%)' }}></div>
             <div className="absolute bottom-0 w-full h-[40%] bg-gradient-to-t from-[#0f172a] to-transparent"></div>
             <div className="absolute inset-0 w-full h-full animate-scan pointer-events-none opacity-5 bg-gradient-to-b from-blue-400 via-transparent to-transparent"></div>

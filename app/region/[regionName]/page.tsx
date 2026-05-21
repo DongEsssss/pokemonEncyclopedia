@@ -7,6 +7,7 @@ import { typeThemes } from '@/src/constants/pokemon';
 import { matchChosung } from '@/src/utils/searchUtils';
 import PokedexSidePanel from '@/src/components/PokedexSidePanel';
 import MoveEditModal from '@/src/components/MoveEditModal';
+
 import { useBattle } from '@/src/context/BattleContext';
 
 interface PokemonSpecies {
@@ -40,7 +41,11 @@ export default function RegionPage() {
     setPlayerPokemon: setContextPlayerPokemon, 
     setOpponentPokemon: setContextOpponentPokemon, 
     setPlayerMoves: setContextPlayerMoves, 
-    setOpponentMoves: setContextOpponentMoves 
+    setOpponentMoves: setContextOpponentMoves,
+    battleMode, setBattleMode,
+    isTournament, setIsTournament,
+    setPlayerTeam, setOpponentTeam,
+    setPlayerTeamMoves, setOpponentTeamMoves
   } = useBattle();
 
   const [entries, setEntries] = useState<PokedexEntry[]>([]);
@@ -57,6 +62,13 @@ export default function RegionPage() {
   const [showP1Info, setShowP1Info] = useState(false);
   const [playerPokedexTab, setPlayerPokedexTab] = useState<'info' | 'moves'>('info');
 
+  const [selectedPlayer2, setSelectedPlayer2] = useState<any>(null);
+  const [playerPokemon2, setPlayerPokemon2] = useState<any>(null);
+  const [playerSpecies2, setPlayerSpecies2] = useState<any>(null);
+  const [playerMoves2, setPlayerMoves2] = useState<any[]>([]);
+  const [showP1Info2, setShowP1Info2] = useState(false);
+  const [playerPokedexTab2, setPlayerPokedexTab2] = useState<'info' | 'moves'>('info');
+
   // Player 2 States
   const [selectedOpponent, setSelectedOpponent] = useState<any>(null);
   const [opponentPokemon, setOpponentPokemon] = useState<any>(null);
@@ -65,9 +77,16 @@ export default function RegionPage() {
   const [showP2Info, setShowP2Info] = useState(false);
   const [opponentPokedexTab, setOpponentPokedexTab] = useState<'info' | 'moves'>('info');
 
+  const [selectedOpponent2, setSelectedOpponent2] = useState<any>(null);
+  const [opponentPokemon2, setOpponentPokemon2] = useState<any>(null);
+  const [opponentSpecies2, setOpponentSpecies2] = useState<any>(null);
+  const [opponentMoves2, setOpponentMoves2] = useState<any[]>([]);
+  const [showP2Info2, setShowP2Info2] = useState(false);
+  const [opponentPokedexTab2, setOpponentPokedexTab2] = useState<'info' | 'moves'>('info');
+
   // Move Modal States
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
-  const [editingPlayer, setEditingPlayer] = useState<'player1' | 'player2' | null>(null);
+  const [editingPlayer, setEditingPlayer] = useState<'player1' | 'player1_2' | 'player2' | 'player2_2' | null>(null);
   const [availableMovesDetails, setAvailableMovesDetails] = useState<any[]>([]);
   const [isLoadingAvailableMoves, setIsLoadingAvailableMoves] = useState(false);
   const [tempSelectedMoves, setTempSelectedMoves] = useState<any[]>([]);
@@ -188,10 +207,10 @@ export default function RegionPage() {
     }
   };
 
-  const openMoveEditModal = async (player: 'player1' | 'player2') => {
+  const openMoveEditModal = async (player: 'player1' | 'player1_2' | 'player2' | 'player2_2') => {
     setEditingPlayer(player);
-    const pokemon = player === 'player1' ? playerPokemon : opponentPokemon;
-    const currentMoves = player === 'player1' ? playerMoves : opponentMoves;
+    const pokemon = player === 'player1' ? playerPokemon : player === 'player1_2' ? playerPokemon2 : player === 'player2' ? opponentPokemon : opponentPokemon2;
+    const currentMoves = player === 'player1' ? playerMoves : player === 'player1_2' ? playerMoves2 : player === 'player2' ? opponentMoves : opponentMoves2;
     setTempSelectedMoves([...currentMoves]);
     setIsMoveModalOpen(true);
     setIsLoadingAvailableMoves(true);
@@ -265,7 +284,7 @@ export default function RegionPage() {
               className="w-full bg-black/20 border border-white/10 rounded-xl pl-10 pr-4 py-1.5 font-sans text-xs text-white placeholder:text-white/20 focus:border-blue-500/50 outline-none transition-all backdrop-blur-md"
             />
           </div>
-          <button onClick={() => { setSelectedPlayer(null); setSelectedOpponent(null); setPlayerPokemon(null); setOpponentPokemon(null); setPokemonSearchTerm(''); }} className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white/40 hover:text-white font-mono font-black text-[9px] uppercase transition-all rounded-lg backdrop-blur-md">Reset</button>
+          <button onClick={() => { setSelectedPlayer(null); setSelectedPlayer2(null); setSelectedOpponent(null); setSelectedOpponent2(null); setPlayerPokemon(null); setPlayerPokemon2(null); setOpponentPokemon(null); setOpponentPokemon2(null); setPokemonSearchTerm(''); }} className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white/40 hover:text-white font-mono font-black text-[9px] uppercase transition-all rounded-lg backdrop-blur-md">Reset</button>
         </div>
       </header>
 
@@ -377,33 +396,83 @@ export default function RegionPage() {
         )}
       </main>
 
-      <footer className="shrink-0 p-4 flex justify-center items-center z-[50] relative">
+      <footer className="shrink-0 p-4 flex flex-col sm:flex-row justify-center items-center gap-4 z-[50] relative">
+        <div className="flex flex-col gap-2 items-center mr-4">
+          <div className="flex bg-black/50 p-1 rounded-xl border border-white/20">
+            <button onClick={() => setBattleMode('1v1')} className={`px-3 py-1 rounded-lg text-xs font-mono font-black uppercase transition-all ${battleMode === '1v1' ? 'bg-blue-500 text-white' : 'text-white/40 hover:text-white'}`}>1v1 Mode</button>
+            <button onClick={() => setBattleMode('2v2')} className={`px-3 py-1 rounded-lg text-xs font-mono font-black uppercase transition-all ${battleMode === '2v2' ? 'bg-blue-500 text-white' : 'text-white/40 hover:text-white'}`}>2v2 Mode</button>
+          </div>
+          <button onClick={() => setIsTournament(!isTournament)} className={`px-4 py-1.5 rounded-xl text-xs font-mono font-black uppercase transition-all border ${isTournament ? 'bg-yellow-500 text-black border-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.5)]' : 'bg-black/50 text-white/40 border-white/20 hover:text-white'}`}>
+            {isTournament ? 'Tournament: ON' : 'Tournament: OFF'}
+          </button>
+        </div>
+
         <div className="w-full max-w-4xl flex items-center gap-6 relative z-10">
           <div className="flex-1 flex justify-around items-center bg-black/40 backdrop-blur-xl border-2 border-black p-2 rounded-[1.5rem] shadow-2xl relative">
             <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-[#DC0A2D] border-2 border-black px-3 py-0.5 rounded-full z-10 shadow-lg"><span className="text-[7px] font-mono text-white font-black tracking-[0.3em] uppercase whitespace-nowrap">READY</span></div>
+            
             <div className="flex items-center gap-3">
               <div onClick={() => selectedPlayer && setShowP1Info(true)} className={`w-12 h-12 rounded-xl border-2 transition-all flex items-center justify-center relative cursor-pointer ${selectedPlayer ? 'bg-blue-500/20 border-blue-500/50' : 'bg-white/5 border-white/5 border-dashed opacity-40'}`}>
                 {selectedPlayer && <img src={selectedPlayer.sprites.front_default} className="w-14 h-14 max-w-none absolute drop-shadow-lg animate-float" style={{ imageRendering: 'pixelated' }} />}
               </div>
-              <span className="hidden sm:block text-[9px] font-mono text-white/50 font-black uppercase tracking-widest truncate max-w-[80px]">{selectedPlayer ? getLocalizedName(playerSpecies, selectedPlayer.name) : 'P1'}</span>
+              {battleMode === '2v2' && (
+                <div onClick={() => selectedPlayer2 && setShowP1Info2(true)} className={`w-12 h-12 rounded-xl border-2 transition-all flex items-center justify-center relative cursor-pointer ${selectedPlayer2 ? 'bg-blue-500/20 border-blue-500/50' : 'bg-white/5 border-white/5 border-dashed opacity-40'}`}>
+                  {selectedPlayer2 && <img src={selectedPlayer2.sprites.front_default} className="w-14 h-14 max-w-none absolute drop-shadow-lg animate-float" style={{ imageRendering: 'pixelated' }} />}
+                </div>
+              )}
             </div>
+
             <div className="text-xl font-mono text-white/10 font-black italic tracking-tighter">VS</div>
+
             <div className="flex items-center gap-3">
-              <span className="hidden sm:block text-[9px] font-mono text-white/50 font-black uppercase tracking-widest truncate max-w-[80px] text-right">{selectedOpponent ? getLocalizedName(opponentSpecies, selectedOpponent.name) : 'P2'}</span>
-              <div onClick={() => selectedOpponent && setShowP2Info(true)} className={`w-12 h-12 rounded-xl border-2 transition-all flex items-center justify-center relative cursor-pointer ${selectedOpponent ? 'bg-red-500/20 border-red-500/50' : 'bg-white/5 border-white/5 border-dashed opacity-40'}`}>
-                {selectedOpponent && <img src={selectedOpponent.sprites.front_default} className="w-14 h-14 max-w-none absolute drop-shadow-lg animate-float" style={{ imageRendering: 'pixelated' }} />}
-              </div>
+              {!isTournament && battleMode === '2v2' && (
+                <div onClick={() => selectedOpponent2 && setShowP2Info2(true)} className={`w-12 h-12 rounded-xl border-2 transition-all flex items-center justify-center relative cursor-pointer ${selectedOpponent2 ? 'bg-red-500/20 border-red-500/50' : 'bg-white/5 border-white/5 border-dashed opacity-40'}`}>
+                  {selectedOpponent2 && <img src={selectedOpponent2.sprites.front_default} className="w-14 h-14 max-w-none absolute drop-shadow-lg animate-float" style={{ imageRendering: 'pixelated' }} />}
+                </div>
+              )}
+              {!isTournament && (
+                <div onClick={() => selectedOpponent && setShowP2Info(true)} className={`w-12 h-12 rounded-xl border-2 transition-all flex items-center justify-center relative cursor-pointer ${selectedOpponent ? 'bg-red-500/20 border-red-500/50' : 'bg-white/5 border-white/5 border-dashed opacity-40'}`}>
+                  {selectedOpponent && <img src={selectedOpponent.sprites.front_default} className="w-14 h-14 max-w-none absolute drop-shadow-lg animate-float" style={{ imageRendering: 'pixelated' }} />}
+                </div>
+              )}
+              {isTournament && (
+                <div className="w-12 h-12 rounded-xl border-2 bg-red-500/10 border-red-500/30 flex items-center justify-center relative">
+                  <span className="text-xs font-mono font-black text-red-400">???</span>
+                </div>
+              )}
             </div>
           </div>
+          
           <button onClick={() => {
-            setContextPlayerPokemon(playerPokemon);
-            setContextOpponentPokemon(opponentPokemon);
-            setContextPlayerMoves(playerMoves);
-            setContextOpponentMoves(opponentMoves);
-            router.push('/battle');
-          }} disabled={!selectedPlayer || !selectedOpponent} className="group relative px-8 py-3 bg-yellow-400 border-[4px] border-black rounded-[1.5rem] shadow-xl hover:-translate-y-1 active:translate-y-0.5 disabled:opacity-20 transition-all overflow-hidden flex-shrink-0">
+            const team1 = []; const moves1 = [];
+            if (selectedPlayer) { team1.push(playerPokemon); moves1.push(playerMoves); }
+            if (selectedPlayer2) { team1.push(playerPokemon2); moves1.push(playerMoves2); }
+            
+            const team2 = []; const moves2 = [];
+            if (selectedOpponent) { team2.push(opponentPokemon); moves2.push(opponentMoves); }
+            if (selectedOpponent2) { team2.push(opponentPokemon2); moves2.push(opponentMoves2); }
+
+            setPlayerTeam(team1);
+            setPlayerTeamMoves(moves1);
+            
+            if (isTournament) {
+              router.push('/tournament');
+            } else {
+              setOpponentTeam(team2);
+              setOpponentTeamMoves(moves2);
+              
+              // Maintain 1v1 compatibility
+              setContextPlayerPokemon(playerPokemon);
+              setContextOpponentPokemon(opponentPokemon);
+              setContextPlayerMoves(playerMoves);
+              setContextOpponentMoves(opponentMoves);
+              router.push('/battle');
+            }
+          }} disabled={!selectedPlayer || (battleMode === '2v2' && !selectedPlayer2) || (!isTournament && !selectedOpponent) || (!isTournament && battleMode === '2v2' && !selectedOpponent2)} className="group relative px-8 py-3 bg-yellow-400 border-[4px] border-black rounded-[1.5rem] shadow-xl hover:-translate-y-1 active:translate-y-0.5 disabled:opacity-20 transition-all overflow-hidden flex-shrink-0">
             <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform"></div>
-            <span className="relative z-10 text-lg font-mono font-black text-black uppercase italic tracking-tighter">{t('Battle')}</span>
+            <span className="relative z-10 text-lg font-mono font-black text-black uppercase italic tracking-tighter">
+              {isTournament ? 'Enter Tourney' : t('Battle')}
+            </span>
           </button>
         </div>
       </footer>

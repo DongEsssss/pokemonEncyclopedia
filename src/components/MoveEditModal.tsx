@@ -2,7 +2,7 @@ import { typeThemes } from '../constants/pokemon';
 import { matchChosung } from '../utils/searchUtils';
 
 interface MoveEditModalProps {
-  editingPlayer: 'player1' | 'player2';
+  editingPlayer: 'player1' | 'player2' | 'player1_2' | 'player2_2';
   moveSearchTerm: string;
   setMoveSearchTerm: (term: string) => void;
   tempSelectedMoves: any[];
