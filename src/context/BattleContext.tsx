@@ -33,6 +33,10 @@ interface BattleContextType {
   setBattleMode: (mode: '1v1' | '2v2') => void;
   isTournament: boolean;
   setIsTournament: (isTourney: boolean) => void;
+  tournamentSize: 4 | 8 | 16 | 32;
+  setTournamentSize: (size: 4 | 8 | 16 | 32) => void;
+  isVsAI: boolean;
+  setIsVsAI: (vsAI: boolean) => void;
 
   // 2v2 State
   playerTeam: Pokemon[];
@@ -63,6 +67,8 @@ export function BattleProvider({ children }: { children: ReactNode }) {
 
   const [battleMode, setBattleMode] = useState<'1v1' | '2v2'>('1v1');
   const [isTournament, setIsTournament] = useState(false);
+  const [tournamentSize, setTournamentSize] = useState<4 | 8 | 16 | 32>(8);
+  const [isVsAI, setIsVsAI] = useState(false);
 
   const [playerTeam, setPlayerTeam] = useState<Pokemon[]>([]);
   const [opponentTeam, setOpponentTeam] = useState<Pokemon[]>([]);
@@ -91,6 +97,8 @@ export function BattleProvider({ children }: { children: ReactNode }) {
         playerMoves, opponentMoves, setPlayerMoves, setOpponentMoves,
         battleMode, setBattleMode,
         isTournament, setIsTournament,
+        tournamentSize, setTournamentSize,
+        isVsAI, setIsVsAI,
         playerTeam, setPlayerTeam,
         opponentTeam, setOpponentTeam,
         playerTeamMoves, setPlayerTeamMoves,
