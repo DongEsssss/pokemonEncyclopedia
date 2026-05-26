@@ -7,6 +7,8 @@ import { typeThemes } from '@/src/constants/pokemon';
 import { matchChosung } from '@/src/utils/searchUtils';
 import PokedexSidePanel from '@/src/components/PokedexSidePanel';
 import MoveEditModal from '@/src/components/MoveEditModal';
+import { getRandomMoves } from '@/src/services/pokeapi';
+
 import { useBattle } from '@/src/context/BattleContext';
 
 interface PokemonSpecies {
@@ -40,7 +42,13 @@ export default function RegionPage() {
     setPlayerPokemon: setContextPlayerPokemon, 
     setOpponentPokemon: setContextOpponentPokemon, 
     setPlayerMoves: setContextPlayerMoves, 
-    setOpponentMoves: setContextOpponentMoves 
+    setOpponentMoves: setContextOpponentMoves,
+    battleMode, setBattleMode,
+    isTournament, setIsTournament,
+    tournamentSize, setTournamentSize,
+    isVsAI, setIsVsAI,
+    setPlayerTeam, setOpponentTeam,
+    setPlayerTeamMoves, setOpponentTeamMoves
   } = useBattle();
 
   const [entries, setEntries] = useState<PokedexEntry[]>([]);
@@ -57,6 +65,13 @@ export default function RegionPage() {
   const [showP1Info, setShowP1Info] = useState(false);
   const [playerPokedexTab, setPlayerPokedexTab] = useState<'info' | 'moves'>('info');
 
+  const [selectedPlayer2, setSelectedPlayer2] = useState<any>(null);
+  const [playerPokemon2, setPlayerPokemon2] = useState<any>(null);
+  const [playerSpecies2, setPlayerSpecies2] = useState<any>(null);
+  const [playerMoves2, setPlayerMoves2] = useState<any[]>([]);
+  const [showP1Info2, setShowP1Info2] = useState(false);
+  const [playerPokedexTab2, setPlayerPokedexTab2] = useState<'info' | 'moves'>('info');
+
   // Player 2 States
   const [selectedOpponent, setSelectedOpponent] = useState<any>(null);
   const [opponentPokemon, setOpponentPokemon] = useState<any>(null);
@@ -65,9 +80,16 @@ export default function RegionPage() {
   const [showP2Info, setShowP2Info] = useState(false);
   const [opponentPokedexTab, setOpponentPokedexTab] = useState<'info' | 'moves'>('info');
 
+  const [selectedOpponent2, setSelectedOpponent2] = useState<any>(null);
+  const [opponentPokemon2, setOpponentPokemon2] = useState<any>(null);
+  const [opponentSpecies2, setOpponentSpecies2] = useState<any>(null);
+  const [opponentMoves2, setOpponentMoves2] = useState<any[]>([]);
+  const [showP2Info2, setShowP2Info2] = useState(false);
+  const [opponentPokedexTab2, setOpponentPokedexTab2] = useState<'info' | 'moves'>('info');
+
   // Move Modal States
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
-  const [editingPlayer, setEditingPlayer] = useState<'player1' | 'player2' | null>(null);
+  const [editingPlayer, setEditingPlayer] = useState<'player1' | 'player1_2' | 'player2' | 'player2_2' | null>(null);
   const [availableMovesDetails, setAvailableMovesDetails] = useState<any[]>([]);
   const [isLoadingAvailableMoves, setIsLoadingAvailableMoves] = useState(false);
   const [tempSelectedMoves, setTempSelectedMoves] = useState<any[]>([]);
@@ -140,58 +162,91 @@ export default function RegionPage() {
     return entries.length > 0 ? entries[0].flavor_text.replace(/\f/g, ' ') : '';
   };
 
+  const togglePanel = (panel: 'p1' | 'p1_2' | 'p2' | 'p2_2') => {
+    if (panel === 'p1') {
+      setShowP1Info(prev => !prev);
+      setShowP1Info2(false);
+    } else if (panel === 'p1_2') {
+      setShowP1Info(false);
+      setShowP1Info2(prev => !prev);
+    } else if (panel === 'p2') {
+      setShowP2Info(prev => !prev);
+      setShowP2Info2(false);
+    } else if (panel === 'p2_2') {
+      setShowP2Info(false);
+      setShowP2Info2(prev => !prev);
+    }
+  };
+
+  const openPanel = (panel: 'p1' | 'p1_2' | 'p2' | 'p2_2') => {
+    if (panel === 'p1') {
+      setShowP1Info(true);
+      setShowP1Info2(false);
+    } else if (panel === 'p1_2') {
+      setShowP1Info(false);
+      setShowP1Info2(true);
+    } else if (panel === 'p2') {
+      setShowP2Info(true);
+      setShowP2Info2(false);
+    } else if (panel === 'p2_2') {
+      setShowP2Info(false);
+      setShowP2Info2(true);
+    }
+  };
+
   const handleSelect = async (entry: any) => {
     const id = entry.pokemon_species.url.split('/').filter(Boolean).pop();
     const pokemonResponse = await fetch(`https://pokeapi.co/api/v2/pokemon/${id}`);
     const pokemonData = await pokemonResponse.json();
+    const speciesResponse = await fetch(entry.pokemon_species.url);
+    const speciesData = await speciesResponse.json();
+
+    const fetchMoves = async (pokemon: any) => {
+      if (pokemon.name === 'magikarp') {
+        const r = await fetch('https://pokeapi.co/api/v2/move/splash');
+        return [await r.json()];
+      } else {
+        const movesPromises = pokemon.moves.slice(0, 4).map(async (m: any) => {
+          const r = await fetch(m.move.url);
+          return r.json();
+        });
+        return await Promise.all(movesPromises);
+      }
+    };
+
+    const movesData = await fetchMoves(pokemonData);
 
     if (!selectedPlayer) {
       setSelectedPlayer(pokemonData);
       setPlayerPokemon(pokemonData);
-      const speciesResponse = await fetch(entry.pokemon_species.url);
-      const speciesData = await speciesResponse.json();
       setPlayerSpecies(speciesData);
-      
-      let movesData;
-      if (pokemonData.name === 'magikarp') {
-        const r = await fetch('https://pokeapi.co/api/v2/move/splash');
-        movesData = [await r.json()];
-      } else {
-        const movesPromises = pokemonData.moves.slice(0, 4).map(async (m: any) => {
-          const r = await fetch(m.move.url);
-          return r.json();
-        });
-        movesData = await Promise.all(movesPromises);
-      }
       setPlayerMoves(movesData);
-      setShowP1Info(true);
-    } else if (!selectedOpponent) {
+      openPanel('p1');
+    } else if (battleMode === '2v2' && !selectedPlayer2) {
+      setSelectedPlayer2(pokemonData);
+      setPlayerPokemon2(pokemonData);
+      setPlayerSpecies2(speciesData);
+      setPlayerMoves2(movesData);
+      openPanel('p1_2');
+    } else if (!selectedOpponent && !isTournament) {
       setSelectedOpponent(pokemonData);
       setOpponentPokemon(pokemonData);
-      const speciesResponse = await fetch(entry.pokemon_species.url);
-      const speciesData = await speciesResponse.json();
       setOpponentSpecies(speciesData);
-      
-      let movesData;
-      if (pokemonData.name === 'magikarp') {
-        const r = await fetch('https://pokeapi.co/api/v2/move/splash');
-        movesData = [await r.json()];
-      } else {
-        const movesPromises = pokemonData.moves.slice(0, 4).map(async (m: any) => {
-          const r = await fetch(m.move.url);
-          return r.json();
-        });
-        movesData = await Promise.all(movesPromises);
-      }
       setOpponentMoves(movesData);
-      setShowP2Info(true);
+      openPanel('p2');
+    } else if (battleMode === '2v2' && !selectedOpponent2 && !isTournament) {
+      setSelectedOpponent2(pokemonData);
+      setOpponentPokemon2(pokemonData);
+      setOpponentSpecies2(speciesData);
+      setOpponentMoves2(movesData);
+      openPanel('p2_2');
     }
   };
 
-  const openMoveEditModal = async (player: 'player1' | 'player2') => {
+  const openMoveEditModal = async (player: 'player1' | 'player1_2' | 'player2' | 'player2_2') => {
     setEditingPlayer(player);
-    const pokemon = player === 'player1' ? playerPokemon : opponentPokemon;
-    const currentMoves = player === 'player1' ? playerMoves : opponentMoves;
+    const pokemon = player === 'player1' ? playerPokemon : player === 'player1_2' ? playerPokemon2 : player === 'player2' ? opponentPokemon : opponentPokemon2;
+    const currentMoves = player === 'player1' ? playerMoves : player === 'player1_2' ? playerMoves2 : player === 'player2' ? opponentMoves : opponentMoves2;
     setTempSelectedMoves([...currentMoves]);
     setIsMoveModalOpen(true);
     setIsLoadingAvailableMoves(true);
@@ -221,8 +276,12 @@ export default function RegionPage() {
   const confirmMoveSelection = () => {
     if (editingPlayer === 'player1') {
       setPlayerMoves(tempSelectedMoves);
-    } else {
+    } else if (editingPlayer === 'player1_2') {
+      setPlayerMoves2(tempSelectedMoves);
+    } else if (editingPlayer === 'player2') {
       setOpponentMoves(tempSelectedMoves);
+    } else if (editingPlayer === 'player2_2') {
+      setOpponentMoves2(tempSelectedMoves);
     }
     setIsMoveModalOpen(false);
   };
@@ -265,7 +324,7 @@ export default function RegionPage() {
               className="w-full bg-black/20 border border-white/10 rounded-xl pl-10 pr-4 py-1.5 font-sans text-xs text-white placeholder:text-white/20 focus:border-blue-500/50 outline-none transition-all backdrop-blur-md"
             />
           </div>
-          <button onClick={() => { setSelectedPlayer(null); setSelectedOpponent(null); setPlayerPokemon(null); setOpponentPokemon(null); setPokemonSearchTerm(''); }} className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white/40 hover:text-white font-mono font-black text-[9px] uppercase transition-all rounded-lg backdrop-blur-md">Reset</button>
+          <button onClick={() => { setSelectedPlayer(null); setSelectedPlayer2(null); setSelectedOpponent(null); setSelectedOpponent2(null); setPlayerPokemon(null); setPlayerPokemon2(null); setOpponentPokemon(null); setOpponentPokemon2(null); setPokemonSearchTerm(''); }} className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white/40 hover:text-white font-mono font-black text-[9px] uppercase transition-all rounded-lg backdrop-blur-md">Reset</button>
         </div>
       </header>
 
@@ -283,6 +342,28 @@ export default function RegionPage() {
                 onTabChange={setPlayerPokedexTab}
                 onEdit={() => openMoveEditModal('player1')}
                 onClose={() => { setShowP1Info(false); setSelectedPlayer(null); setPlayerPokemon(null); }}
+                t={t}
+                getLocalizedName={getLocalizedName}
+                getLocalizedPokemonDescription={getLocalizedPokemonDescription}
+                getLocalizedMoveName={getLocalizedMoveName}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* P1-2 상세 */}
+        {selectedPlayer2 && showP1Info2 && (
+          <div className={`lg:shrink-0 h-full ${(typeof window !== 'undefined' && window.innerWidth < 1024) ? 'fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-end lg:items-center justify-center' : 'relative z-40 flex flex-col justify-center'}`}>
+            <div className="absolute inset-0 lg:hidden" onClick={() => setShowP1Info2(false)}></div>
+            <div className="w-full lg:w-auto h-full transform transition-transform duration-500 ease-out animate-in slide-in-from-bottom lg:slide-in-from-left">
+              <PokedexSidePanel
+                pokemon={selectedPlayer2}
+                species={playerSpecies2}
+                moves={playerMoves2}
+                tab={playerPokedexTab2}
+                onTabChange={setPlayerPokedexTab2}
+                onEdit={() => openMoveEditModal('player1_2')}
+                onClose={() => { setShowP1Info2(false); setSelectedPlayer2(null); setPlayerPokemon2(null); }}
                 t={t}
                 getLocalizedName={getLocalizedName}
                 getLocalizedPokemonDescription={getLocalizedPokemonDescription}
@@ -375,35 +456,147 @@ export default function RegionPage() {
             </div>
           </div>
         )}
+
+        {/* P2-2 상세 */}
+        {selectedOpponent2 && showP2Info2 && (
+          <div className={`lg:shrink-0 h-full ${(typeof window !== 'undefined' && window.innerWidth < 1024) ? 'fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-end lg:items-center justify-center' : 'relative z-40 flex flex-col justify-center'}`}>
+            <div className="absolute inset-0 lg:hidden" onClick={() => setShowP2Info2(false)}></div>
+            <div className="w-full lg:w-auto h-full transform transition-transform duration-500 ease-out animate-in slide-in-from-bottom lg:slide-in-from-right">
+              <PokedexSidePanel
+                pokemon={selectedOpponent2}
+                species={opponentSpecies2}
+                moves={opponentMoves2}
+                tab={opponentPokedexTab2}
+                onTabChange={setOpponentPokedexTab2}
+                onEdit={() => openMoveEditModal('player2_2')}
+                onClose={() => { setShowP2Info2(false); setSelectedOpponent2(null); setOpponentPokemon2(null); }}
+                isOpponent
+                t={t}
+                getLocalizedName={getLocalizedName}
+                getLocalizedPokemonDescription={getLocalizedPokemonDescription}
+                getLocalizedMoveName={getLocalizedMoveName}
+              />
+            </div>
+          </div>
+        )}
       </main>
 
-      <footer className="shrink-0 p-4 flex justify-center items-center z-[50] relative">
+      <footer className="shrink-0 p-4 flex flex-col sm:flex-row justify-center items-center gap-4 z-[50] relative">
+        <div className="flex flex-col gap-2 items-center mr-4">
+          <div className="flex bg-black/50 p-1 rounded-xl border border-white/20 gap-2">
+            <div className="flex">
+              <button onClick={() => setBattleMode('1v1')} className={`px-2 sm:px-3 py-1 rounded-l-lg text-[10px] sm:text-xs font-mono font-black uppercase transition-all border-r border-white/10 ${battleMode === '1v1' ? 'bg-blue-500 text-white' : 'text-white/40 hover:text-white'}`}>1v1</button>
+              <button onClick={() => setBattleMode('2v2')} className={`px-2 sm:px-3 py-1 rounded-r-lg text-[10px] sm:text-xs font-mono font-black uppercase transition-all ${battleMode === '2v2' ? 'bg-blue-500 text-white' : 'text-white/40 hover:text-white'}`}>2v2</button>
+            </div>
+            <div className="w-[1px] bg-white/20"></div>
+            <div className="flex">
+              <button onClick={() => setIsVsAI(false)} className={`px-2 sm:px-3 py-1 rounded-l-lg text-[10px] sm:text-xs font-mono font-black uppercase transition-all border-r border-white/10 ${!isVsAI ? 'bg-purple-500 text-white' : 'text-white/40 hover:text-white'}`}>PvP</button>
+              <button onClick={() => setIsVsAI(true)} className={`px-2 sm:px-3 py-1 rounded-r-lg text-[10px] sm:text-xs font-mono font-black uppercase transition-all ${isVsAI ? 'bg-purple-500 text-white' : 'text-white/40 hover:text-white'}`}>PvE (AI)</button>
+            </div>
+          </div>
+          
+          <div className="flex bg-black/50 p-1 rounded-xl border border-white/20 gap-2 items-center">
+            <button onClick={() => setIsTournament(!isTournament)} className={`px-3 py-1 rounded-lg text-[10px] sm:text-xs font-mono font-black uppercase transition-all border ${isTournament ? 'bg-yellow-500 text-black border-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.5)]' : 'border-transparent text-white/40 hover:text-white'}`}>
+              Tourney: {isTournament ? 'ON' : 'OFF'}
+            </button>
+            {isTournament && (
+              <select 
+                value={tournamentSize} 
+                onChange={(e) => setTournamentSize(Number(e.target.value) as 4|8|16|32)}
+                className="bg-black/50 text-yellow-400 font-mono text-xs font-black border border-yellow-500/50 rounded p-1 outline-none appearance-none cursor-pointer hover:bg-yellow-500/10 transition-colors"
+              >
+                <option value={4}>4 Players</option>
+                <option value={8}>8 Players</option>
+                <option value={16}>16 Players</option>
+                <option value={32}>32 Players</option>
+              </select>
+            )}
+          </div>
+        </div>
+
         <div className="w-full max-w-4xl flex items-center gap-6 relative z-10">
           <div className="flex-1 flex justify-around items-center bg-black/40 backdrop-blur-xl border-2 border-black p-2 rounded-[1.5rem] shadow-2xl relative">
             <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-[#DC0A2D] border-2 border-black px-3 py-0.5 rounded-full z-10 shadow-lg"><span className="text-[7px] font-mono text-white font-black tracking-[0.3em] uppercase whitespace-nowrap">READY</span></div>
+            
             <div className="flex items-center gap-3">
-              <div onClick={() => selectedPlayer && setShowP1Info(true)} className={`w-12 h-12 rounded-xl border-2 transition-all flex items-center justify-center relative cursor-pointer ${selectedPlayer ? 'bg-blue-500/20 border-blue-500/50' : 'bg-white/5 border-white/5 border-dashed opacity-40'}`}>
+              <div onClick={() => selectedPlayer && togglePanel('p1')} className={`w-12 h-12 rounded-xl border-2 transition-all flex items-center justify-center relative cursor-pointer ${selectedPlayer ? 'bg-blue-500/20 border-blue-500/50' : 'bg-white/5 border-white/5 border-dashed opacity-40'}`}>
                 {selectedPlayer && <img src={selectedPlayer.sprites.front_default} className="w-14 h-14 max-w-none absolute drop-shadow-lg animate-float" style={{ imageRendering: 'pixelated' }} />}
               </div>
-              <span className="hidden sm:block text-[9px] font-mono text-white/50 font-black uppercase tracking-widest truncate max-w-[80px]">{selectedPlayer ? getLocalizedName(playerSpecies, selectedPlayer.name) : 'P1'}</span>
+              {battleMode === '2v2' && (
+                <div onClick={() => selectedPlayer2 && togglePanel('p1_2')} className={`w-12 h-12 rounded-xl border-2 transition-all flex items-center justify-center relative cursor-pointer ${selectedPlayer2 ? 'bg-blue-500/20 border-blue-500/50' : 'bg-white/5 border-white/5 border-dashed opacity-40'}`}>
+                  {selectedPlayer2 && <img src={selectedPlayer2.sprites.front_default} className="w-14 h-14 max-w-none absolute drop-shadow-lg animate-float" style={{ imageRendering: 'pixelated' }} />}
+                </div>
+              )}
             </div>
+
             <div className="text-xl font-mono text-white/10 font-black italic tracking-tighter">VS</div>
+
             <div className="flex items-center gap-3">
-              <span className="hidden sm:block text-[9px] font-mono text-white/50 font-black uppercase tracking-widest truncate max-w-[80px] text-right">{selectedOpponent ? getLocalizedName(opponentSpecies, selectedOpponent.name) : 'P2'}</span>
-              <div onClick={() => selectedOpponent && setShowP2Info(true)} className={`w-12 h-12 rounded-xl border-2 transition-all flex items-center justify-center relative cursor-pointer ${selectedOpponent ? 'bg-red-500/20 border-red-500/50' : 'bg-white/5 border-white/5 border-dashed opacity-40'}`}>
-                {selectedOpponent && <img src={selectedOpponent.sprites.front_default} className="w-14 h-14 max-w-none absolute drop-shadow-lg animate-float" style={{ imageRendering: 'pixelated' }} />}
-              </div>
+              {(!isTournament && !isVsAI) ? (
+                <>
+                  {battleMode === '2v2' && (
+                    <div onClick={() => selectedOpponent2 && togglePanel('p2_2')} className={`w-12 h-12 rounded-xl border-2 transition-all flex items-center justify-center relative cursor-pointer ${selectedOpponent2 ? 'bg-red-500/20 border-red-500/50' : 'bg-white/5 border-white/5 border-dashed opacity-40'}`}>
+                      {selectedOpponent2 && <img src={selectedOpponent2.sprites.front_default} className="w-14 h-14 max-w-none absolute drop-shadow-lg animate-float" style={{ imageRendering: 'pixelated' }} />}
+                    </div>
+                  )}
+                  <div onClick={() => selectedOpponent && togglePanel('p2')} className={`w-12 h-12 rounded-xl border-2 transition-all flex items-center justify-center relative cursor-pointer ${selectedOpponent ? 'bg-red-500/20 border-red-500/50' : 'bg-white/5 border-white/5 border-dashed opacity-40'}`}>
+                    {selectedOpponent && <img src={selectedOpponent.sprites.front_default} className="w-14 h-14 max-w-none absolute drop-shadow-lg animate-float" style={{ imageRendering: 'pixelated' }} />}
+                  </div>
+                </>
+              ) : (
+                <div className="w-12 h-12 rounded-xl border-2 bg-red-500/10 border-red-500/30 flex items-center justify-center relative">
+                  <span className="text-xs font-mono font-black text-red-400 text-center leading-none">CPU<br/><span className="text-[8px]">AUTO</span></span>
+                </div>
+              )}
             </div>
           </div>
-          <button onClick={() => {
-            setContextPlayerPokemon(playerPokemon);
-            setContextOpponentPokemon(opponentPokemon);
-            setContextPlayerMoves(playerMoves);
-            setContextOpponentMoves(opponentMoves);
+          
+          <button onClick={async () => {
+            const team1 = []; const moves1 = [];
+            if (selectedPlayer) { team1.push(playerPokemon); moves1.push(playerMoves); }
+            if (selectedPlayer2) { team1.push(playerPokemon2); moves1.push(playerMoves2); }
+            
+            const team2 = []; const moves2 = [];
+            
+            if (isTournament) {
+              setPlayerTeam(team1);
+              setPlayerTeamMoves(moves1);
+              router.push('/tournament');
+              return;
+            }
+
+            if (isVsAI) {
+              // Auto generate AI opponents
+              for (let i = 0; i < (battleMode === '2v2' ? 2 : 1); i++) {
+                const randomId = Math.floor(Math.random() * 898) + 1;
+                const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${randomId}`);
+                const data = await res.json();
+                team2.push(data);
+                moves2.push(await getRandomMoves(data.moves, 4));
+              }
+            } else {
+              if (selectedOpponent) { team2.push(opponentPokemon); moves2.push(opponentMoves); }
+              if (selectedOpponent2) { team2.push(opponentPokemon2); moves2.push(opponentMoves2); }
+            }
+
+            setPlayerTeam(team1);
+            setPlayerTeamMoves(moves1);
+            setOpponentTeam(team2);
+            setOpponentTeamMoves(moves2);
+            
+            // Maintain 1v1 compatibility
+            setContextPlayerPokemon(team1[0]);
+            setContextPlayerMoves(moves1[0]);
+            setContextOpponentPokemon(team2[0]);
+            setContextOpponentMoves(moves2[0]);
+            
             router.push('/battle');
-          }} disabled={!selectedPlayer || !selectedOpponent} className="group relative px-8 py-3 bg-yellow-400 border-[4px] border-black rounded-[1.5rem] shadow-xl hover:-translate-y-1 active:translate-y-0.5 disabled:opacity-20 transition-all overflow-hidden flex-shrink-0">
+            
+          }} disabled={!selectedPlayer || (battleMode === '2v2' && !selectedPlayer2) || (!isTournament && !isVsAI && !selectedOpponent) || (!isTournament && !isVsAI && battleMode === '2v2' && !selectedOpponent2)} className="group relative px-6 sm:px-8 py-2 sm:py-3 bg-yellow-400 border-[4px] border-black rounded-[1.5rem] shadow-xl hover:-translate-y-1 active:translate-y-0.5 disabled:opacity-20 transition-all overflow-hidden flex-shrink-0">
             <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform"></div>
-            <span className="relative z-10 text-lg font-mono font-black text-black uppercase italic tracking-tighter">{t('Battle')}</span>
+            <span className="relative z-10 text-sm sm:text-lg font-mono font-black text-black uppercase italic tracking-tighter">
+              {isTournament ? 'Enter Tourney' : t('Battle')}
+            </span>
           </button>
         </div>
       </footer>

@@ -14,7 +14,16 @@ import { Turn, MajorStatus, VolatileStatus, StatStages } from '@/src/types/battl
 export default function BattlePage() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
-  const { playerPokemon, opponentPokemon, setPlayerPokemon, setOpponentPokemon, playerMoves: contextPlayerMoves, opponentMoves: contextOpponentMoves, resetBattle } = useBattle();
+  const { 
+    playerPokemon, opponentPokemon, setPlayerPokemon, setOpponentPokemon, 
+    playerMoves: contextPlayerMoves, opponentMoves: contextOpponentMoves, 
+    playerTeam, opponentTeam, playerTeamMoves, opponentTeamMoves,
+    isTournament, tournamentMatches, setTournamentMatches,
+    isVsAI, currentMatchId,
+    resetBattle 
+  } = useBattle();
+  const [activePlayerIdx, setActivePlayerIdx] = useState(0);
+  const [activeOpponentIdx, setActiveOpponentIdx] = useState(0);
 
   const [logs, setLogs] = useState<{ text: string, type: 'p1' | 'p2' | 'sys' }[]>([]);
   const [battleOver, setBattleOver] = useState(false);
@@ -173,12 +182,82 @@ export default function BattlePage() {
     const handleFaint = async (faintedPlayer: 'p1' | 'p2', faintedPokemon: any, species: any, winnerLabel: string) => {
       setFainting(faintedPlayer);
       await wait(1500);
+
+      const team = faintedPlayer === 'p1' ? playerTeam : opponentTeam;
+      const teamMoves = faintedPlayer === 'p1' ? playerTeamMoves : opponentTeamMoves;
+      const activeIdx = faintedPlayer === 'p1' ? activePlayerIdx : activeOpponentIdx;
+
+      if (team && activeIdx + 1 < team.length) {
+        const nextIdx = activeIdx + 1;
+        const nextPokemon = team[nextIdx];
+        const nextMoves = teamMoves[nextIdx];
+
+        setLogs(prev => [...prev, { text: t('{{name}} fainted!', { name: getLocalizedName(species, faintedPokemon.name) }), type: 'sys' }]);
+        await wait(1000);
+
+        try {
+          const nextSpecies = await getPokemonSpecies(nextPokemon.name);
+          if (faintedPlayer === 'p1') {
+            setActivePlayerIdx(nextIdx);
+            setPlayerPokemon(nextPokemon);
+            setPlayerSpecies(nextSpecies);
+            setPlayerMoves(nextMoves);
+            setPlayerHp((getStatValue(nextPokemon, 'hp') || 50) * 3);
+            setPlayerStatus(null);
+            setPlayerVolatile({ confusionTurns: 0, flinch: false, infatuation: false, curse: false, sleepTurns: 0, toxTurns: 0 });
+            setPlayerStatStages(defaultStages);
+          } else {
+            setActiveOpponentIdx(nextIdx);
+            setOpponentPokemon(nextPokemon);
+            setOpponentSpecies(nextSpecies);
+            setOpponentMoves(nextMoves);
+            setOppHp((getStatValue(nextPokemon, 'hp') || 50) * 3);
+            setOppStatus(null);
+            setOppVolatile({ confusionTurns: 0, flinch: false, infatuation: false, curse: false, sleepTurns: 0, toxTurns: 0 });
+            setOppStatStages(defaultStages);
+          }
+          setFainting(null);
+          setLogs(prev => [...prev, { text: t('Go, {{name}}!', { name: getLocalizedName(nextSpecies, nextPokemon.name) }), type: faintedPlayer === 'p1' ? 'p1' : 'p2' }]);
+          await wait(1000);
+        } catch (error) {
+          console.error(error);
+        }
+        return endTurn();
+      }
+
       const winName = getLocalizedName(faintedPlayer === 'p1' ? opponentSpecies : playerSpecies, faintedPlayer === 'p1' ? opponentPokemon!.name : playerPokemon!.name);
       setWinner({ player: winnerLabel, pokemon: winName });
       setLogs(prev => [...prev, { text: t('{{name}} fainted! {{winner}} wins!', { name: getLocalizedName(species, faintedPokemon.name), winner: winnerLabel }), type: isPlayer1 ? 'p1' : 'p2' }]);
       setBattleOver(true);
       setIsProcessing(false);
       setDamageEffect(null);
+      
+      // Update Tournament State
+      if (isTournament && currentMatchId) {
+        const newMatches = [...tournamentMatches];
+        const matchIdx = newMatches.findIndex(m => m.id === currentMatchId);
+        if (matchIdx !== -1) {
+          const match = newMatches[matchIdx];
+          const isHumanPlayer1InMatch = match.player1?.name === 'Player';
+          const humanWon = faintedPlayer === 'p2';
+          
+          if (isHumanPlayer1InMatch) {
+            match.winner = humanWon ? 1 : 2;
+          } else {
+            match.winner = humanWon ? 2 : 1;
+          }
+          
+          if (match.nextMatchId) {
+            const nextMatch = newMatches.find(m => m.id === match.nextMatchId);
+            if (nextMatch) {
+              const advancingPlayer = match.winner === 1 ? match.player1 : match.player2;
+              if (match.id % 2 !== 0) nextMatch.player1 = advancingPlayer;
+              else nextMatch.player2 = advancingPlayer;
+            }
+          }
+          setTournamentMatches(newMatches);
+        }
+      }
     };
 
     // ==========================================
@@ -612,10 +691,50 @@ export default function BattlePage() {
     endTurn();
   };
 
-  if (!playerPokemon || !opponentPokemon) return null;
+  // AI Turn Logic
+  useEffect(() => {
+    if (battleOver || isProcessing || !opponentMoves.length) return;
+    
+    if (isVsAI && currentTurn === 'player2') {
+      const runAITurn = async () => {
+        setIsProcessing(true); // Prevent multiple triggers
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        const validMoves = opponentMoves.filter(m => m !== null && m !== undefined);
+        if (validMoves.length > 0) {
+          const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+          setIsProcessing(false); // Enable executeTurn
+          executeTurn(randomMove);
+        } else {
+          setIsProcessing(false);
+          if (opponentMoves.length > 0) executeTurn(opponentMoves[0]);
+        }
+      };
+      runAITurn();
+    }
+  }, [currentTurn, isVsAI, battleOver, isProcessing, opponentMoves]);
 
-  const maxPlayerHp = (getStatValue(playerPokemon, 'hp') || 50) * 3;
+  if (!playerPokemon || !opponentPokemon) return null;
+const maxPlayerHp = (getStatValue(playerPokemon, 'hp') || 50) * 3;
   const maxOppHp = (getStatValue(opponentPokemon, 'hp') || 50) * 3;
+
+  const getHpPercentage = (hp: number, maxHp: number) => Math.max(0, Math.min(100, (hp / maxHp) * 100));
+
+  const getHpColor = (percentage: number) => {
+    if (percentage > 50) return 'bg-green-500';
+    if (percentage > 20) return 'bg-yellow-400';
+    return 'bg-red-500';
+  };
+
+  const TeamIcons = ({ team, activeIdx, isPlayer }: { team: any[], activeIdx: number, isPlayer: boolean }) => (
+    <div className={`flex gap-1 absolute top-2 ${isPlayer ? 'left-2' : 'right-2'} z-50`}>
+      {team?.map((p, i) => (
+        <div key={i} className={`w-8 h-8 rounded-full border-2 ${i === activeIdx ? 'border-yellow-400 bg-white/20' : 'border-white/20 bg-black/40'} flex items-center justify-center overflow-hidden`}>
+          <img src={p.sprites.front_default} className={`w-10 h-10 max-w-none ${i < activeIdx ? 'grayscale opacity-50' : ''}`} style={{ imageRendering: 'pixelated' }} />
+        </div>
+      ))}
+    </div>
+  );
 
   const activeMoves = currentTurn === 'player1' ? playerMoves : opponentMoves;
   const activePlayerName = currentTurn === 'player1' ? 'PLAYER 1' : 'PLAYER 2';
@@ -701,6 +820,8 @@ export default function BattlePage() {
 
         <div className="flex-1 relative bg-black/40 border-[4px] sm:border-[6px] border-black rounded-[1.5rem] sm:rounded-[3rem] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.5)]">
           <div className="absolute inset-0 bg-[#0a0a1a] overflow-hidden">
+            {playerTeam && playerTeam.length > 1 && <TeamIcons team={playerTeam} activeIdx={activePlayerIdx} isPlayer={true} />}
+            {opponentTeam && opponentTeam.length > 1 && <TeamIcons team={opponentTeam} activeIdx={activeOpponentIdx} isPlayer={false} />}
             <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, #1e3a8a 0%, transparent 80%)' }}></div>
             <div className="absolute bottom-0 w-full h-[40%] bg-gradient-to-t from-[#0f172a] to-transparent"></div>
             <div className="absolute inset-0 w-full h-full animate-scan pointer-events-none opacity-5 bg-gradient-to-b from-blue-400 via-transparent to-transparent"></div>
@@ -926,16 +1047,23 @@ export default function BattlePage() {
             ) : battleOver ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3">
                 <div className="text-sm sm:text-2xl font-mono font-black text-black uppercase bg-yellow-400 px-4 sm:px-8 py-1.5 sm:py-2 rounded-lg sm:rounded-xl border-2 sm:border-4 border-black shadow-[4px_4px_0_0_#000]">{t('Battle Ended')}</div>
-                <button onClick={() => { resetBattle(); router.back(); }} className="px-6 sm:px-10 py-2 sm:py-3 bg-blue-600 text-white border-2 sm:border-4 border-black rounded-lg sm:rounded-xl font-mono font-black uppercase text-[10px] sm:text-sm shadow-[4px_4px_0_0_#000] hover:bg-blue-500 active:translate-y-0.5 active:shadow-none transition-all outline-none">
-                  {t('Restart')}
-                </button>
+                
+                {isTournament ? (
+                  <button onClick={() => { router.push('/tournament'); }} className="px-6 sm:px-10 py-2 sm:py-3 bg-yellow-500 text-black border-2 sm:border-4 border-black rounded-lg sm:rounded-xl font-mono font-black uppercase text-[10px] sm:text-sm shadow-[4px_4px_0_0_#000] hover:bg-yellow-400 active:translate-y-0.5 active:shadow-none transition-all outline-none">
+                    {t('대진표로 돌아가기')}
+                  </button>
+                ) : (
+                  <button onClick={() => { resetBattle(); router.back(); }} className="px-6 sm:px-10 py-2 sm:py-3 bg-blue-600 text-white border-2 sm:border-4 border-black rounded-lg sm:rounded-xl font-mono font-black uppercase text-[10px] sm:text-sm shadow-[4px_4px_0_0_#000] hover:bg-blue-500 active:translate-y-0.5 active:shadow-none transition-all outline-none">
+                    {t('Restart')}
+                  </button>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-2 sm:gap-3 h-full overflow-hidden">
                 {activeMoves.map((move, idx) => (
                   <button
                     key={`${move.name}-${idx}`}
-                    disabled={isProcessing}
+                    disabled={isProcessing || (isVsAI && currentTurn === 'player2')}
                     onClick={() => executeTurn(move)}
                     className={`group relative h-full p-3 sm:p-5 border-l-[8px] sm:border-l-[12px] border-black rounded-r-2xl sm:rounded-r-[3rem] transition-all duration-500 flex flex-col justify-center overflow-hidden disabled:opacity-20 hover:translate-x-3 active:translate-x-1 outline-none`}
                     style={{
