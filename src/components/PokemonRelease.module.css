@@ -1,0 +1,87 @@
+.release {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  pointer-events: none;
+}
+
+.ball {
+  position: absolute;
+  bottom: 10%;
+  left: 50%;
+  width: clamp(1.1rem, 42%, 2.6rem);
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  animation: ball-arrive 620ms ease-out both;
+}
+
+.ball::before,
+.ball::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  height: 50%;
+  border: 2px solid #292532;
+}
+
+.ball::before {
+  top: 0;
+  border-radius: 3rem 3rem 0 0;
+  background: #e83d4e;
+  animation: ball-open 620ms ease-out both;
+}
+
+.ball::after {
+  bottom: 0;
+  border-top: 0;
+  border-radius: 0 0 3rem 3rem;
+  background: #fffaed;
+}
+
+.flash {
+  position: absolute;
+  z-index: 1;
+  width: 72%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fffdf0 0 12%, #ffe5a1 22%, #fff6bb00 70%);
+  animation: release-flash 620ms ease-out both;
+}
+
+.sprite {
+  position: relative;
+  z-index: 2;
+  max-width: none;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 3px 3px #15122066);
+  animation: sprite-emerge 620ms ease-out both;
+}
+
+@keyframes ball-arrive {
+  0% { opacity: 0; transform: translate(-50%, -65%) rotate(-28deg); }
+  25%, 42% { opacity: 1; transform: translate(-50%, 0); }
+  75%, 100% { opacity: 0; transform: translate(-50%, 20%); }
+}
+
+@keyframes ball-open {
+  0%, 34% { transform: translateY(0); }
+  65%, 100% { transform: translateY(-45%) rotate(-14deg); }
+}
+
+@keyframes release-flash {
+  0%, 35%, 100% { opacity: 0; transform: scale(0.2); }
+  48% { opacity: 0.8; transform: scale(1); }
+  75% { opacity: 0; transform: scale(1.3); }
+}
+
+@keyframes sprite-emerge {
+  0%, 33% { opacity: 0; transform: translateY(30%) scale(0.12); }
+  72% { opacity: 1; transform: translateY(-10%) scale(1.08); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ball, .flash { display: none; }
+  .sprite { animation: none; }
+}

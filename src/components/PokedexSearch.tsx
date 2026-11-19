@@ -60,28 +60,27 @@ export default function PokedexSearch({ isOpen, onClose }: PokedexSearchProps) {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-xl animate-in fade-in duration-500" onClick={onClose}></div>
+      <div className="lab-dialog-backdrop absolute inset-0" onClick={onClose}></div>
       
-      <div className="relative w-full max-w-2xl bg-[#050a14] border-[6px] border-blue-500/20 rounded-[3rem] shadow-[0_0_80px_rgba(59,130,246,0.25)] overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
+      <div className="lab-dialog lab-search-dialog relative w-full max-w-2xl flex flex-col" role="dialog" aria-label={t('Encyclopedia Search')}>
         
         {/* 헤더 */}
-        <div className="p-8 border-b border-white/5 flex justify-between items-center shrink-0">
+        <div className="lab-dialog-header flex justify-between items-center shrink-0">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(37,99,235,0.4)]">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             </div>
             <div>
               <h2 className="text-xl font-mono font-black text-white uppercase tracking-tighter">{t('Encyclopedia Search')}</h2>
-              <p className="text-[10px] font-mono text-blue-400/50 uppercase tracking-[0.2em]">Pokedex.Database_Access.v1.0</p>
             </div>
           </div>
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 text-white/40 hover:text-white transition-colors">
+          <button onClick={onClose} aria-label={t('Close')} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 text-white/40 hover:text-white transition-colors">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
         </div>
 
         {/* 검색창 */}
-        <div className="px-8 py-6 bg-white/5 border-b border-white/5 shrink-0">
+        <div className="lab-search-form shrink-0">
           <form onSubmit={handleSearch} className="relative">
             <input 
               type="text"
@@ -101,7 +100,7 @@ export default function PokedexSearch({ isOpen, onClose }: PokedexSearchProps) {
         </div>
 
         {/* 결과 영역 */}
-        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-[radial-gradient(circle_at_50%_0%,rgba(59,130,246,0.05),transparent_70%)]">
+        <div className="lab-search-results flex-1 overflow-y-auto custom-scrollbar bg-[radial-gradient(circle_at_50%_0%,rgba(59,130,246,0.05),transparent_70%)]">
           {!result && !loading && !error && (
             <div className="h-full flex flex-col items-center justify-center opacity-20 py-20">
               <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>

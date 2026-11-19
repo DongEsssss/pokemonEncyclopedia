@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { getRandomMoves, getPokemonSpecies, getFixedMovesDetailsByNames } from '@/src/services/pokeapi';
 import { typeThemes } from '@/src/constants/pokemonData';
 import { getMultiplier, calculateDamage, getStatValue, getHpPercentage, getHpColor, getModifiedStat } from '@/src/utils/battleUtils';
+import { moveHits, nextTeamMemberIndex, residualHp } from '@/src/utils/battleRules';
 import { MoveDetails, PokemonSpecies } from '@/src/types/pokemon';
 import { Turn, MajorStatus, VolatileStatus, StatStages } from '@/src/types/battle';
 
@@ -90,8 +91,8 @@ export default function BattlePage() {
 
       try {
         const [pSpecies, oSpecies] = await Promise.all([
-          getPokemonSpecies(playerPokemon.name),
-          getPokemonSpecies(opponentPokemon.name)
+          getPokemonSpecies(playerPokemon.name).catch(() => null),
+          getPokemonSpecies(opponentPokemon.name).catch(() => null)
         ]);
         setPlayerSpecies(pSpecies);
         setOpponentSpecies(oSpecies);
@@ -151,7 +152,7 @@ export default function BattlePage() {
     // Determine move category (Status vs Attack)
     const isStatusMove = move.power === null || move.power === 0 || move.damage_class?.name === 'status';
     const physicalTypes = ['normal', 'fighting', 'poison', 'ground', 'rock', 'bug', 'ghost', 'steel', 'flying'];
-    const isPhysical = move.damage_class?.name === 'physical' || physicalTypes.includes(move.type.name);
+    const isPhysical = move.damage_class ? move.damage_class.name === 'physical' : physicalTypes.includes(move.type.name);
 
     const baseAttackerAtk = getStatValue(attacker, isPhysical ? 'attack' : 'special-attack') || 10;
     const baseDefenderDef = getStatValue(defender, isPhysical ? 'defense' : 'special-defense') || 10;
@@ -187,8 +188,8 @@ export default function BattlePage() {
       const teamMoves = faintedPlayer === 'p1' ? playerTeamMoves : opponentTeamMoves;
       const activeIdx = faintedPlayer === 'p1' ? activePlayerIdx : activeOpponentIdx;
 
-      if (team && activeIdx + 1 < team.length) {
-        const nextIdx = activeIdx + 1;
+      const nextIdx = nextTeamMemberIndex(activeIdx, team.length);
+      if (nextIdx !== null) {
         const nextPokemon = team[nextIdx];
         const nextMoves = teamMoves[nextIdx];
 
@@ -196,7 +197,7 @@ export default function BattlePage() {
         await wait(1000);
 
         try {
-          const nextSpecies = await getPokemonSpecies(nextPokemon.name);
+          const nextSpecies = await getPokemonSpecies(nextPokemon.name).catch(() => null);
           if (faintedPlayer === 'p1') {
             setActivePlayerIdx(nextIdx);
             setPlayerPokemon(nextPokemon);
@@ -258,6 +259,33 @@ export default function BattlePage() {
           setTournamentMatches(newMatches);
         }
       }
+    };
+
+    let attackerHpAfterMove = isPlayer1 ? playerHp : oppHp;
+    const finishTurn = async () => {
+      const attackerSide = isPlayer1 ? 'p1' : 'p2';
+      const applyResidualDamage = async (fraction: number, message: string) => {
+        attackerHpAfterMove = residualHp(attackerHpAfterMove, maxAttackerHp, fraction);
+        if (isPlayer1) setPlayerHp(attackerHpAfterMove);
+        else setOppHp(attackerHpAfterMove);
+        setLogs(prev => [...prev, { text: t(message, { name: attackerName }), type: attackerSide }]);
+        await wait(1000);
+        if (attackerHpAfterMove > 0) return false;
+        await handleFaint(attackerSide, attacker, attackerSpecies, isPlayer1 ? 'PLAYER 2' : 'PLAYER 1');
+        return true;
+      };
+
+      if (attackerStatus === 'BRN') {
+        if (await applyResidualDamage(1 / 16, '{{name}} is hurt by its burn!')) return;
+      } else if (attackerStatus === 'PSN') {
+        if (await applyResidualDamage(1 / 8, '{{name}} is hurt by poison!')) return;
+      } else if (attackerStatus === 'TOX') {
+        if (await applyResidualDamage(attackerVolatile.toxTurns / 16, '{{name}} is hurt by bad poison!')) return;
+        setAttackerVolatile(prev => ({ ...prev, toxTurns: prev.toxTurns + 1 }));
+      }
+
+      if (attackerVolatile.curse && await applyResidualDamage(1 / 4, '{{name}} is afflicted by the curse!')) return;
+      endTurn();
     };
 
     // ==========================================
@@ -359,6 +387,15 @@ export default function BattlePage() {
     // ==========================================
     // PHASE 2: MOVE EXECUTION
     // ==========================================
+
+    if (!moveHits(move.accuracy)) {
+      setLogs(prev => [...prev,
+        { text: t('{{name}} used {{move}}!', { name: attackerName, move: moveName }), type: isPlayer1 ? 'p1' : 'p2' },
+        { text: t('{{name}} missed!', { name: attackerName }), type: isPlayer1 ? 'p1' : 'p2' },
+      ]);
+      await wait(1000);
+      return finishTurn();
+    }
 
     // Easter Eggs
     if (attacker.name === 'magikarp' && move.name === 'splash') {
@@ -631,11 +668,13 @@ export default function BattlePage() {
       } else if (['curse'].includes(move.name) && attacker.types.some(t => t.type.name === 'ghost')) {
         // Ghost type curse: Lose half HP, target is cursed
         const selfDmg = Math.floor(maxAttackerHp / 2);
-        if (isPlayer1) { setPlayerHp(Math.max(0, playerHp - selfDmg)); } else { setOppHp(Math.max(0, oppHp - selfDmg)); }
+        attackerHpAfterMove = Math.max(0, attackerHpAfterMove - selfDmg);
+        if (isPlayer1) setPlayerHp(attackerHpAfterMove);
+        else setOppHp(attackerHpAfterMove);
         setDefenderVolatile(prev => ({ ...prev, curse: true }));
         setLogs(prev => [...prev, { text: t('{{name}} cut its own HP and laid a curse on {{target}}!', { name: attackerName, target: defenderName }), type: isPlayer1 ? 'p1' : 'p2' }]);
         await wait(1500);
-        if ((isPlayer1 ? playerHp - selfDmg : oppHp - selfDmg) <= 0) {
+        if (attackerHpAfterMove === 0) {
           return handleFaint(isPlayer1 ? 'p1' : 'p2', attacker, attackerSpecies, isPlayer1 ? 'PLAYER 2' : 'PLAYER 1');
         }
       } else {
@@ -648,47 +687,7 @@ export default function BattlePage() {
     setAttackAnim(null);
     await wait(600);
 
-    // ==========================================
-    // PHASE 3: POST-ATTACK DOTS
-    // ==========================================
-    const applyDot = async (playerKey: 'p1' | 'p2', dmgFn: (maxHp: number) => number, msg: string) => {
-      const isP1 = playerKey === 'p1';
-      const pMon = isP1 ? playerPokemon : opponentPokemon;
-      const pSpec = isP1 ? playerSpecies : opponentSpecies;
-      const maxHp = (getStatValue(pMon, 'hp') || 50) * 3;
-      const dmg = dmgFn(maxHp);
-
-      if (isP1) {
-        const nextHp = Math.max(0, playerHp - dmg);
-        setPlayerHp(nextHp);
-        setLogs(prev => [...prev, { text: t(msg, { name: getLocalizedName(pSpec, pMon!.name) }), type: isPlayer1 ? 'p1' : 'p2' }]);
-        await wait(1000);
-        if (nextHp <= 0) { await handleFaint('p1', pMon, pSpec, 'PLAYER 2'); return true; }
-      } else {
-        const nextHp = Math.max(0, oppHp - dmg);
-        setOppHp(nextHp);
-        setLogs(prev => [...prev, { text: t(msg, { name: getLocalizedName(pSpec, pMon!.name) }), type: isPlayer1 ? 'p1' : 'p2' }]);
-        await wait(1000);
-        if (nextHp <= 0) { await handleFaint('p2', pMon, pSpec, 'PLAYER 1'); return true; }
-      }
-      return false;
-    };
-
-    if (attackerStatus === 'BRN') {
-      if (await applyDot(isPlayer1 ? 'p1' : 'p2', max => Math.floor(max / 16), '{{name}} is hurt by its burn!')) return;
-    } else if (attackerStatus === 'PSN') {
-      if (await applyDot(isPlayer1 ? 'p1' : 'p2', max => Math.floor(max / 8), '{{name}} is hurt by poison!')) return;
-    } else if (attackerStatus === 'TOX') {
-      const mult = attackerVolatile.toxTurns;
-      if (await applyDot(isPlayer1 ? 'p1' : 'p2', max => Math.floor((max * mult) / 16), '{{name}} is hurt by bad poison!')) return;
-      setAttackerVolatile(prev => ({ ...prev, toxTurns: prev.toxTurns + 1 }));
-    }
-
-    if (attackerVolatile.curse) {
-      if (await applyDot(isPlayer1 ? 'p1' : 'p2', max => Math.floor(max / 4), '{{name}} is afflicted by the curse!')) return;
-    }
-
-    endTurn();
+    await finishTurn();
   };
 
   // AI Turn Logic
@@ -737,10 +736,10 @@ const maxPlayerHp = (getStatValue(playerPokemon, 'hp') || 50) * 3;
   );
 
   const activeMoves = currentTurn === 'player1' ? playerMoves : opponentMoves;
-  const activePlayerName = currentTurn === 'player1' ? 'PLAYER 1' : 'PLAYER 2';
+  const activePlayerName = t(currentTurn === 'player1' ? 'Player 1' : 'Player 2');
 
   return (
-    <div className="h-screen bg-[#050505] text-white font-sans overflow-hidden flex flex-col selection:bg-blue-500">
+    <div className="lab-battle lab-width">
       {dittoEasterEgg && (
         <div className="absolute inset-0 z-[200] bg-pink-200 flex flex-col items-center justify-center overflow-hidden">
           {/* Bouncing Dittos */}
@@ -788,44 +787,18 @@ const maxPlayerHp = (getStatValue(playerPokemon, 'hp') || 50) * 3;
         </div>
       )}
 
-      <div className="fixed inset-0 pointer-events-none overflow-hidden opacity-[0.03]">
-        <div style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '40px 40px' }} className="absolute inset-0"></div>
-      </div>
-
-      <header className="z-50 bg-[#1a1a1a]/80 backdrop-blur-xl border-b-[4px] sm:border-b-[6px] border-black px-4 sm:px-8 py-3 sm:py-4 flex justify-between items-center shrink-0 shadow-2xl">
-        <div className="flex items-center gap-3 sm:gap-6">
-          <div onClick={() => router.back()} className="cursor-pointer group flex items-center gap-3">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-red-600 border-2 sm:border-4 border-black rounded-lg sm:rounded-xl shadow-[3px_3px_0_0_#000] group-hover:translate-x-1 transition-all flex items-center justify-center">
-              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[7px] sm:text-[9px] font-black text-blue-400 uppercase tracking-[0.3em] mb-0.5 sm:mb-1 leading-none">Simulation Active</span>
-              <h1 className="text-sm sm:text-xl font-mono text-white uppercase font-black tracking-tighter leading-none">{t('Battle Arena')}</h1>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 sm:gap-4">
-          <div className="hidden xs:flex flex-col items-end mr-2 sm:mr-4">
-            <span className="text-[7px] sm:text-[8px] font-black text-white/30 uppercase tracking-widest mb-0.5">Latency</span>
-            <span className="text-[8px] sm:text-[10px] font-mono text-green-500 font-bold">12ms</span>
-          </div>
-          <div className="w-[1px] sm:w-[2px] h-6 sm:h-8 bg-white/10"></div>
-          <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-blue-500/20 border-2 border-blue-500 flex items-center justify-center animate-pulse">
-            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-400 rounded-full"></div>
-          </div>
-        </div>
+      <header className="lab-page-heading">
+        <h1 className="lab-route-title">{t('Battle Arena')}</h1>
+        <button type="button" className="lab-button lab-button-outline" onClick={() => router.back()}>{t('Back')}</button>
       </header>
 
-      <main className="flex-1 flex flex-col p-2 sm:p-4 lg:p-6 gap-3 sm:gap-6 relative overflow-hidden">
+      <main className="lab-battle-main">
 
-        <div className="flex-1 relative bg-black/40 border-[4px] sm:border-[6px] border-black rounded-[1.5rem] sm:rounded-[3rem] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.5)]">
-          <div className="absolute inset-0 bg-[#0a0a1a] overflow-hidden">
+        <div className="lab-arena">
+          <div className="lab-arena-field absolute inset-0 overflow-hidden">
+            <div className="lab-arena-court" aria-hidden="true"><span /></div>
             {playerTeam && playerTeam.length > 1 && <TeamIcons team={playerTeam} activeIdx={activePlayerIdx} isPlayer={true} />}
             {opponentTeam && opponentTeam.length > 1 && <TeamIcons team={opponentTeam} activeIdx={activeOpponentIdx} isPlayer={false} />}
-            <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, #1e3a8a 0%, transparent 80%)' }}></div>
-            <div className="absolute bottom-0 w-full h-[40%] bg-gradient-to-t from-[#0f172a] to-transparent"></div>
-            <div className="absolute inset-0 w-full h-full animate-scan pointer-events-none opacity-5 bg-gradient-to-b from-blue-400 via-transparent to-transparent"></div>
-            <div className="absolute bottom-0 w-full h-1/2 opacity-10" style={{ backgroundImage: 'linear-gradient(transparent, rgba(255,255,255,0.1) 90%), linear-gradient(90deg, transparent, rgba(255,255,255,0.1) 90%)', backgroundSize: '100px 40px', transform: 'perspective(500px) rotateX(60deg)' }}></div>
           </div>
 
           {flashColor && (
@@ -835,7 +808,7 @@ const maxPlayerHp = (getStatValue(playerPokemon, 'hp') || 50) * 3;
           )}
 
           <div className={`absolute top-[5%] right-[5%] sm:top-[8%] sm:right-[8%] flex flex-col items-end gap-2 sm:gap-3 z-10 animate-in slide-in-from-right duration-700 ${damageEffect === 'p2' && lastMultiplier > 1 ? 'animate-screen-shake' : ''}`}>
-            <div className="bg-[#1a1a1a]/70 backdrop-blur-xl border border-white/10 p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-2xl min-w-[200px] sm:min-w-[300px] relative overflow-hidden z-20">
+            <div className="lab-fighter-hud">
               <div className="absolute top-0 left-0 w-full h-1 bg-red-500/30"></div>
               <div className="flex justify-between items-end mb-1 sm:mb-2 border-b border-white/5 pb-1">
                 <div className="flex items-center gap-1.5 overflow-hidden">
@@ -880,16 +853,14 @@ const maxPlayerHp = (getStatValue(playerPokemon, 'hp') || 50) * 3;
               )}
 
               {/* 액티브 배틀 패드 (원형) */}
-              <div className={`absolute -bottom-4 left-1/2 -translate-x-1/2 w-32 sm:w-60 h-8 sm:h-16 transition-all duration-700 ${currentTurn === 'player2' ? 'opacity-100 scale-110' : 'opacity-20 scale-90'}`}>
-                <div className="absolute inset-0 bg-blue-500/20 rounded-[50%] blur-xl animate-pulse"></div>
-                <div className="absolute inset-[10%] border-2 sm:border-4 border-blue-500/40 rounded-[50%] shadow-[0_0_20px_rgba(59,130,246,0.6)]"></div>
-                <div className="absolute inset-0 border border-white/20 rounded-[50%]"></div>
+              <div className={`lab-arena-platform absolute -bottom-4 left-1/2 -translate-x-1/2 w-32 sm:w-60 h-8 sm:h-16 transition-all duration-700 ${currentTurn === 'player2' ? 'opacity-100 scale-110' : 'opacity-70 scale-90'}`}>
               </div>
 
               <img
                 src={opponentPokemon.sprites.front_default}
+                alt=""
                 className={`w-24 h-24 sm:w-48 sm:h-48 relative z-10 transition-all duration-500 
-                    ${currentTurn === 'player2' ? 'scale-110' : 'scale-100 opacity-60 grayscale-[30%]'} 
+                    ${currentTurn === 'player2' ? 'scale-110' : 'scale-100 opacity-95'}
                     ${hitFlash === 'p2' ? 'brightness-[10] contrast-[2] transition-none' : ''}
                     ${fainting === 'p2' ? 'animate-faint pointer-events-none' : ''}
                     ${evolutionAnim === 'p2' ? 'animate-evolution-squish-p2 pointer-events-none transition-none' : ''}`}
@@ -919,16 +890,14 @@ const maxPlayerHp = (getStatValue(playerPokemon, 'hp') || 50) * 3;
               )}
 
               {/* 액티브 배틀 패드 (원형) */}
-              <div className={`absolute -bottom-4 left-1/2 -translate-x-1/2 w-32 sm:w-64 h-10 sm:h-20 transition-all duration-700 ${currentTurn === 'player1' ? 'opacity-100 scale-110' : 'opacity-20 scale-90'}`}>
-                <div className="absolute inset-0 bg-blue-400/20 rounded-[50%] blur-xl animate-pulse"></div>
-                <div className="absolute inset-[10%] border-2 sm:border-4 border-blue-400/40 rounded-[50%] shadow-[0_0_20px_rgba(96,165,250,0.6)]"></div>
-                <div className="absolute inset-0 border border-white/20 rounded-[50%]"></div>
+              <div className={`lab-arena-platform absolute -bottom-4 left-1/2 -translate-x-1/2 w-32 sm:w-64 h-10 sm:h-20 transition-all duration-700 ${currentTurn === 'player1' ? 'opacity-100 scale-110' : 'opacity-70 scale-90'}`}>
               </div>
 
               <img
                 src={playerPokemon.sprites.front_default}
+                alt=""
                 className={`w-28 h-28 sm:w-52 sm:h-52 relative z-10 transition-all duration-500 scale-x-[-1] 
-                    ${currentTurn === 'player1' ? 'scale-x-[-1.1] scale-y-[1.1]' : 'scale-x-[-1] opacity-60 grayscale-[30%]'} 
+                    ${currentTurn === 'player1' ? 'scale-x-[-1.1] scale-y-[1.1]' : 'scale-x-[-1] opacity-95'}
                     ${hitFlash === 'p1' ? 'brightness-[10] contrast-[2] transition-none' : ''}
                     ${fainting === 'p1' ? 'animate-faint pointer-events-none' : ''}
                     ${evolutionAnim === 'p1' ? 'animate-evolution-squish-p1 pointer-events-none transition-none' : ''}`}
@@ -942,7 +911,7 @@ const maxPlayerHp = (getStatValue(playerPokemon, 'hp') || 50) * 3;
                 </div>
               )}
             </div>
-            <div className="bg-[#1a1a1a]/70 backdrop-blur-xl border border-white/10 p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-2xl min-w-[200px] sm:min-w-[300px] relative overflow-hidden z-20">
+            <div className="lab-fighter-hud">
               <div className="absolute top-0 left-0 w-full h-1 bg-blue-400/30"></div>
               <div className="flex justify-between items-end mb-1 sm:mb-2 border-b border-white/5 pb-1">
                 <div className="flex items-center gap-1.5 overflow-hidden">
@@ -979,7 +948,7 @@ const maxPlayerHp = (getStatValue(playerPokemon, 'hp') || 50) * 3;
           {!battleOver && !loading && (
             <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex items-center justify-center z-50 pointer-events-none px-4">
               <div className={`px-4 sm:px-12 py-1.5 sm:py-3 bg-black/60 border-y-2 sm:border-y-4 border-blue-500/30 backdrop-blur-xl transition-all duration-500 transform ${isProcessing ? 'opacity-0 scale-90' : 'opacity-100 scale-100'}`}>
-                <p className="font-mono text-white text-[10px] sm:text-2xl font-black tracking-[0.1em] sm:tracking-[0.3em] uppercase animate-pulse text-center">{activePlayerName} TURN</p>
+                <p className="font-mono text-white text-[10px] sm:text-2xl font-black tracking-[0.1em] sm:tracking-[0.3em] uppercase animate-pulse text-center">{t('{{player}} turn', { player: activePlayerName })}</p>
               </div>
             </div>
           )}
@@ -1023,19 +992,16 @@ const maxPlayerHp = (getStatValue(playerPokemon, 'hp') || 50) * 3;
         </div>
 
         {/* 하단 제어 센터 (모바일/데스크탑 반응형 슬라이딩) */}
-        <div className="h-44 sm:h-56 shrink-0 relative w-full overflow-hidden">
+        <div className="lab-battle-controls">
 
           {/* 커맨드 콘솔 */}
           <div
-            className={`absolute top-0 h-full transition-all duration-700 ease-in-out z-20 border-[4px] sm:border-[6px] border-black rounded-[1.5rem] sm:rounded-[2rem] p-3 sm:p-4 flex flex-col shadow-2xl ${currentTurn === 'player1'
-              ? 'left-0 w-[calc(65%-0.5rem)] sm:w-[calc(65%-0.75rem)] bg-blue-900/20 shadow-[0_0_40px_rgba(59,130,246,0.2)]'
-              : 'left-[calc(35%+0.5rem)] sm:left-[calc(35%+0.75rem)] w-[calc(65%-0.5rem)] sm:w-[calc(65%-0.75rem)] bg-red-900/20 shadow-[0_0_40px_rgba(239,68,68,0.2)]'
-              }`}
+            className="lab-move-console"
           >
             <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 sm:px-4 sm:py-1 bg-black border-2 border-white/10 rounded-full z-30 flex items-center gap-2">
               <div className={`w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full animate-pulse ${currentTurn === 'player1' ? 'bg-blue-400 shadow-[0_0_8px_#60a5fa]' : 'bg-red-500 shadow-[0_0_8px_#ef4444]'}`}></div>
               <span className={`text-[7px] sm:text-[8px] font-mono font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] ${currentTurn === 'player1' ? 'text-blue-400' : 'text-red-500'}`}>
-                {currentTurn === 'player1' ? 'PLAYER_01' : 'PLAYER_02'}
+                {t('Choose a move')}
               </span>
             </div>
 
@@ -1059,39 +1025,36 @@ const maxPlayerHp = (getStatValue(playerPokemon, 'hp') || 50) * 3;
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-2 sm:gap-3 h-full overflow-hidden">
+              <div className="lab-move-grid">
                 {activeMoves.map((move, idx) => (
                   <button
                     key={`${move.name}-${idx}`}
                     disabled={isProcessing || (isVsAI && currentTurn === 'player2')}
                     onClick={() => executeTurn(move)}
-                    className={`group relative h-full p-3 sm:p-5 border-l-[8px] sm:border-l-[12px] border-black rounded-r-2xl sm:rounded-r-[3rem] transition-all duration-500 flex flex-col justify-center overflow-hidden disabled:opacity-20 hover:translate-x-3 active:translate-x-1 outline-none`}
+                    className="lab-move-button"
                     style={{
-                      backgroundColor: `${typeThemes[move.type.name]?.main || '#555'}ee`,
-                      boxShadow: `0 10px 30px -10px rgba(0,0,0,0.5), inset -10px 0 20px rgba(0,0,0,0.2)`,
                       borderLeftColor: typeThemes[move.type.name]?.neon || '#fff'
                     }}
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
 
                     <div className="relative z-10 flex items-center justify-between w-full px-1">
                       <div className="flex flex-col gap-1 text-left">
                         <div className="flex items-center gap-2">
                           <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: typeThemes[move.type.name]?.neon }}></div>
-                          <span className="font-mono text-[7px] sm:text-[9px] font-black text-black/40 uppercase tracking-[0.3em]">{move.type.name}</span>
+                          <span className="lab-move-type">{move.type.name}</span>
                         </div>
-                        <p className="font-mono font-black text-sm sm:text-2xl text-white uppercase tracking-tighter [text-shadow:_0_2px_4px_rgb(0_0_0_/_80%)] group-hover:scale-110 transition-transform origin-left">{getLocalizedMoveName(move)}</p>
+                        <p className="lab-move-name">{getLocalizedMoveName(move)}</p>
                       </div>
 
                       <div className="flex gap-2 sm:gap-5 items-center">
                         <div className="flex flex-col items-end">
-                          <span className="text-[6px] sm:text-[8px] text-white/30 uppercase font-black tracking-widest">Power</span>
+                          <span className="lab-move-label">{t('Power')}</span>
                           <span className="text-[10px] sm:text-lg font-mono font-black text-white">{move.power || '--'}</span>
                         </div>
                         <div className="w-[1px] h-6 sm:h-10 bg-white/10"></div>
                         <div className="flex flex-col items-end">
-                          <span className="text-[6px] sm:text-[8px] text-white/30 uppercase font-black tracking-widest">Accuracy</span>
-                          <span className="text-[10px] sm:text-lg font-mono font-black text-white">{move.accuracy || '--'}%</span>
+                          <span className="lab-move-label">{t('Accuracy')}</span>
+                          <span className="text-[10px] sm:text-lg font-mono font-black text-white">{move.accuracy === null ? '—' : `${move.accuracy}%`}</span>
                         </div>
                       </div>
                     </div>
@@ -1107,16 +1070,13 @@ const maxPlayerHp = (getStatValue(playerPokemon, 'hp') || 50) * 3;
           {/* 배틀 데이터 로그 (반응형 사이징) */}
           <div
             ref={logBoxRef}
-            className={`absolute top-0 h-full transition-all duration-700 ease-in-out z-10 bg-[#0a0a0a] border-[4px] sm:border-[6px] border-black rounded-[1.5rem] sm:rounded-[2rem] p-3 sm:p-4 overflow-y-auto shadow-inner custom-scrollbar ${currentTurn === 'player1'
-              ? 'right-0 w-[calc(35%-0.5rem)] sm:w-[calc(35%-0.75rem)]'
-              : 'right-[calc(65%+0.5rem)] sm:right-[calc(65%+0.75rem)] w-[calc(35%-0.5rem)] sm:w-[calc(35%-0.75rem)]'
-              }`}
+            className="lab-battle-log"
           >
-            <div className="absolute top-1.5 right-3 text-[6px] sm:text-[8px] font-black text-white/10 uppercase tracking-widest">Live</div>
+            <div className="lab-log-title">{t("Battle log")}</div>
             {logs.map((logObj, i) => (
               <div key={i} className={`flex gap-1.5 sm:gap-3 mb-1.5 sm:mb-2.5 items-start animate-in fade-in slide-in-from-bottom-1 sm:slide-in-from-bottom-2 duration-300 ${logObj.type === 'p1' ? 'text-blue-400' : logObj.type === 'p2' ? 'text-red-400' : 'text-gray-400'}`}>
                 <span className={`font-mono text-[10px] sm:text-sm opacity-50 ${logObj.type === 'p1' ? 'text-blue-400' : logObj.type === 'p2' ? 'text-red-400' : 'text-gray-400'}`}>»</span>
-                <p className={`font-mono text-[8px] sm:text-[13px] uppercase tracking-tighter leading-tight font-black drop-shadow-[0_0_5px_rgba(255,255,255,0.1)] ${logObj.type === 'p1' ? 'text-blue-400' : logObj.type === 'p2' ? 'text-red-400' : 'text-gray-400'}`}>{logObj.text}</p>
+                <p className="lab-log-message">{logObj.text}</p>
               </div>
             ))}
           </div>
@@ -1124,27 +1084,6 @@ const maxPlayerHp = (getStatValue(playerPokemon, 'hp') || 50) * 3;
       </main>
 
       {/* 시스템 푸터 (반응형 최적화) */}
-      <footer className="shrink-0 bg-[#1a1a1a] border-t-[4px] sm:border-t-[8px] border-black px-4 sm:px-12 py-2 sm:py-3 flex justify-between items-center shadow-2xl">
-        <div className="flex gap-4 sm:gap-8">
-          <div className="flex flex-col">
-            <span className="text-[6px] sm:text-[7px] font-black text-white/30 uppercase tracking-widest">Sim.Core</span>
-            <span className="text-[8px] sm:text-[10px] font-mono text-white font-black uppercase text-blue-400">PKE-v1.2</span>
-          </div>
-          <div className="hidden xs:flex flex-col">
-            <span className="text-[6px] sm:text-[7px] font-black text-white/30 uppercase tracking-widest">Entropy</span>
-            <span className="text-[8px] sm:text-[10px] font-mono text-white font-black uppercase">0.0215</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 sm:gap-4">
-          <span className="hidden sm:block text-[10px] font-mono text-white/20 font-black uppercase tracking-widest">System Authorized</span>
-          <div className="flex gap-1">
-            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500/40"></div>
-            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500/40"></div>
-            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500 shadow-[0_0_10px_#3b82f6]"></div>
-          </div>
-        </div>
-      </footer>
-
       <style jsx global>{`
         @keyframes scan {
           0% { transform: translateY(-100%); }

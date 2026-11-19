@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
-import { Nunito, Press_Start_2P } from "next/font/google";
+import { Bricolage_Grotesque, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "./design.css";
 import { BattleProvider } from "../src/context/BattleContext";
 import { I18nProvider } from "../src/i18n/I18nProvider";
-import LanguageSwitcher from "../src/components/LanguageSwitcher";
+import AppHeader from "../src/components/AppHeader";
 
-const nunito = Nunito({
-  variable: "--font-nunito",
+const display = Bricolage_Grotesque({
+  variable: "--font-display",
   subsets: ["latin"],
 });
 
-const pressStart2P = Press_Start_2P({
-  variable: "--font-press-start",
-  weight: "400",
+const mono = Geist_Mono({
+  variable: "--font-data",
   subsets: ["latin"],
 });
 
@@ -29,12 +29,12 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${nunito.variable} ${pressStart2P.variable} h-full antialiased font-sans`}
+      className={`${display.variable} ${mono.variable} h-full antialiased font-sans`}
     >
       <body className="min-h-full flex flex-col relative">
         <I18nProvider>
           <BattleProvider>
-            <LanguageSwitcher />
+            <AppHeader />
             {children}
           </BattleProvider>
         </I18nProvider>

@@ -75,12 +75,12 @@ export default function NeuralLinkSpeedTest({ isOpen, onClose }: NeuralLinkSpeed
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       {/* 배경 오버레이 */}
       <div
-        className="absolute inset-0 bg-black/80 backdrop-blur-xl animate-in fade-in duration-500"
+        className="lab-dialog-backdrop absolute inset-0"
         onClick={onClose}
       ></div>
 
       {/* 모달 콘텐츠 */}
-      <div className="relative w-full max-w-xl bg-[#050a14] border-[6px] border-blue-500/20 rounded-[3rem] shadow-[0_0_80px_rgba(59,130,246,0.25)] overflow-hidden animate-in zoom-in-95 duration-300">
+      <div className="lab-dialog lab-speed-dialog relative w-full max-w-xl" role="dialog" aria-label={t('Neural Sync Node')}>
 
         {/* 홀로그램 효과 오버레이 */}
         <div className="absolute inset-0 pointer-events-none">
@@ -93,13 +93,14 @@ export default function NeuralLinkSpeedTest({ isOpen, onClose }: NeuralLinkSpeed
         <div className="absolute top-0 right-0 p-6 z-20">
           <button
             onClick={onClose}
+            aria-label={t('Close')}
             className="w-12 h-12 flex items-center justify-center rounded-2xl bg-white/5 border-2 border-white/10 text-white/40 hover:bg-white/10 hover:text-white hover:border-blue-500/50 transition-all active:scale-90"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
         </div>
 
-        <div className="relative z-10 p-10 sm:p-14 flex flex-col items-center">
+        <div className="relative z-10 p-6 sm:p-10 flex flex-col items-center">
 
           {/* 메인 표시 영역 */}
           <div className="mb-12 flex flex-col items-center">

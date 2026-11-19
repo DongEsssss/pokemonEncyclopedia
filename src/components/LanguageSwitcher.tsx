@@ -1,35 +1,36 @@
 "use client";
 
-import React from "react";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
+
+const languages = [
+  { code: "ko", name: "한국어" },
+  { code: "en", name: "English" },
+  { code: "ja", name: "日本語" },
+];
 
 export default function LanguageSwitcher() {
   const { i18n } = useTranslation();
+  const activeLanguage = i18n.resolvedLanguage ?? i18n.language;
 
-  const changeLanguage = (lng: string) => {
-    i18n.changeLanguage(lng);
-  };
+  useEffect(() => {
+    document.documentElement.lang = activeLanguage;
+  }, [activeLanguage]);
 
   return (
-    <div className="absolute top-4 right-4 flex gap-2">
-      <button 
-        onClick={() => changeLanguage('ko')}
-        className={`px-3 py-1 text-sm font-bold rounded-full transition ${i18n.language === 'ko' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-      >
-        KO
-      </button>
-      <button 
-        onClick={() => changeLanguage('en')}
-        className={`px-3 py-1 text-sm font-bold rounded-full transition ${i18n.language === 'en' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-      >
-        EN
-      </button>
-      <button 
-        onClick={() => changeLanguage('ja')}
-        className={`px-3 py-1 text-sm font-bold rounded-full transition ${i18n.language === 'ja' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-      >
-        JA
-      </button>
+    <div className="lab-languages" role="group" aria-label="Language">
+      {languages.map(({ code, name }) => (
+        <button
+          type="button"
+          key={code}
+          lang={code}
+          aria-label={name}
+          aria-pressed={activeLanguage === code}
+          onClick={() => void i18n.changeLanguage(code)}
+        >
+          {code.toUpperCase()}
+        </button>
+      ))}
     </div>
   );
 }

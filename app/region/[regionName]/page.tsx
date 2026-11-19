@@ -2,35 +2,40 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
+import { REGION_DATA } from '@/src/constants/regionData';
 import { typeThemes } from '@/src/constants/pokemon';
 import { matchChosung } from '@/src/utils/searchUtils';
 import PokedexSidePanel from '@/src/components/PokedexSidePanel';
 import MoveEditModal from '@/src/components/MoveEditModal';
-import { getRandomMoves } from '@/src/services/pokeapi';
+import PokemonRelease from '@/src/components/PokemonRelease';
+import LanguageSwitcher from '@/src/components/LanguageSwitcher';
+import { getPokedexEntries, getPokemon, getPokemonSpecies, getRandomMoves } from '@/src/services/pokeapi';
 
 import { useBattle } from '@/src/context/BattleContext';
 
-interface PokemonSpecies {
-  name: string;
-  url: string;
-}
+import type { PokedexEntry, Pokemon } from '@/src/types/pokemon';
 
-interface PokedexEntry {
-  entry_number: number;
-  pokemon_species: PokemonSpecies;
-}
-
-const REGION_BG_MAP: Record<string, string> = {
-  kanto: 'https://images.unsplash.com/photo-1542332213-9b5a5a3fad35?auto=format&fit=crop&q=80&w=2070',
-  johto: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&q=80&w=2069',
-  hoenn: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&q=80&w=2070',
-  sinnoh: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=2070',
-  unova: 'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?auto=format&fit=crop&q=80&w=2013',
-  kalos: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&q=80&w=2073',
-  alola: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&q=80&w=2073',
-  galar: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=2070'
+const POKEDEX_IDS: Record<string, number> = {
+  kanto: 2, johto: 3, hoenn: 4, sinnoh: 5, unova: 8, kalos: 12, alola: 16, galar: 27, paldea: 31,
 };
+
+function TeamSlot({ pokemon, label, onClick }: {
+  pokemon: Pokemon | null;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button type="button" className="lab-team-slot" disabled={!pokemon} aria-label={label} title={pokemon ? label : undefined} onClick={onClick}>
+      {pokemon ? (
+        <PokemonRelease key={pokemon.id} src={pokemon.sprites.front_default} size={48} />
+      ) : (
+        <span className="lab-team-empty" aria-hidden="true" />
+      )}
+    </button>
+  );
+}
 
 export default function RegionPage() {
   const { t, i18n } = useTranslation();
@@ -48,13 +53,19 @@ export default function RegionPage() {
     tournamentSize, setTournamentSize,
     isVsAI, setIsVsAI,
     setPlayerTeam, setOpponentTeam,
-    setPlayerTeamMoves, setOpponentTeamMoves
+    setPlayerTeamMoves, setOpponentTeamMoves, setTournamentMatches, setCurrentMatchId
   } = useBattle();
 
-  const [entries, setEntries] = useState<PokedexEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingProgress, setLoadingProgress] = useState(0);
-  const [localizedNames, setLocalizedNames] = useState<Record<string, string>>({});
+  const [pokedex, setPokedex] = useState<{ region: string; entries: PokedexEntry[] } | null>(null);
+  const [failedRegion, setFailedRegion] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const entries = pokedex?.region === regionName ? pokedex.entries : null;
+  const language = i18n.language.split('-')[0];
+  const namesKey = regionName + "/" + language;
+  const [translations, setTranslations] = useState<{ key: string; names: Record<string, string> } | null>(null);
+  const localizedNames = translations?.key === namesKey ? translations.names : {};
+  const [launching, setLaunching] = useState(false);
+  const [launchFailed, setLaunchFailed] = useState(false);
   const [pokemonSearchTerm, setPokemonSearchTerm] = useState('');
 
   // Player 1 States
@@ -99,44 +110,41 @@ export default function RegionPage() {
   const mainScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await fetch(`https://pokeapi.co/api/v2/pokedex/${regionName === 'kanto' ? '2' : regionName === 'johto' ? '3' : regionName === 'hoenn' ? '4' : regionName === 'sinnoh' ? '5' : regionName === 'unova' ? '8' : regionName === 'kalos' ? '12' : regionName === 'alola' ? '16' : '27'}`);
-        const data = await response.json();
-        setEntries(data.pokemon_entries);
-
-        const nameMap: Record<string, string> = {};
-        const total = data.pokemon_entries.length;
-        let completed = 0;
-
-        const chunkSize = 20;
-        for (let i = 0; i < total; i += chunkSize) {
-          const chunk = data.pokemon_entries.slice(i, i + chunkSize);
-          await Promise.all(chunk.map(async (entry: any) => {
-            try {
-              const res = await fetch(entry.pokemon_species.url);
-              const speciesData = await res.json();
-              const nameObj = speciesData.names.find((n: any) => n.language.name === (i18n.language === 'ko' ? 'ko' : 'en'));
-              nameMap[entry.pokemon_species.name] = nameObj ? nameObj.name : entry.pokemon_species.name;
-            } catch (e) {
-              console.error(e);
-            } finally {
-              completed++;
-              setLoadingProgress(Math.floor((completed / total) * 100));
-            }
-          }));
-          // 브라우저 렌더링(Progress Bar UI 갱신)을 위해 메인 스레드에 휴식 부여
-          await new Promise(resolve => setTimeout(resolve, 30));
+    const request = new AbortController();
+    getPokedexEntries(POKEDEX_IDS[regionName] ?? 27, request.signal)
+      .then((entries) => {
+        if (!request.signal.aborted) {
+          setPokedex({ region: regionName, entries });
+          setFailedRegion(null);
         }
-        setLocalizedNames(prev => ({ ...prev, ...nameMap }));
-      } catch (error) {
-        console.error('Error fetching Pokedex:', error);
-      } finally {
-        setLoading(false);
+      })
+      .catch(() => {
+        if (!request.signal.aborted) setFailedRegion(regionName);
+      });
+    return () => request.abort();
+  }, [regionName, loadAttempt]);
+
+  useEffect(() => {
+    if (!entries?.length) return;
+    const request = new AbortController();
+    async function translateNames(list: PokedexEntry[]) {
+      const batchSize = 20;
+      for (let offset = 0; offset < list.length; offset += batchSize) {
+        const names = await Promise.all(list.slice(offset, offset + batchSize).map(async ({ pokemon_species }) => {
+          const species = await getPokemonSpecies(pokemon_species.name, request.signal).catch(() => null);
+          const name = species?.names.find((entry) => entry.language.name === language)?.name;
+          return [pokemon_species.name, name ?? pokemon_species.name] as const;
+        }));
+        if (request.signal.aborted) return;
+        setTranslations((previous) => ({
+          key: namesKey,
+          names: { ...(previous?.key === namesKey ? previous.names : {}), ...Object.fromEntries(names) },
+        }));
       }
-    };
-    fetchData();
-  }, [regionName, i18n.language]);
+    }
+    void translateNames(entries);
+    return () => request.abort();
+  }, [entries, language, namesKey]);
 
   const getLocalizedName = (species: any, defaultName: string) => {
     if (!species) return defaultName;
@@ -286,52 +294,25 @@ export default function RegionPage() {
     setIsMoveModalOpen(false);
   };
 
-  const bgPath = REGION_BG_MAP[regionName] || REGION_BG_MAP.kanto;
-
+  const regionTitle = REGION_DATA[regionName]?.nameKey;
   return (
-    <div className="h-screen flex flex-col bg-[#0a0a0a] text-white overflow-hidden relative font-sans selection:bg-blue-500/30">
-      
-      {/* 고정 배경 레이어 */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute inset-0 bg-black/40 z-10"></div>
-        <img src={bgPath} className="w-full h-full object-cover animate-ken-burns" />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-[#0a0a0a] z-20"></div>
-        <div className="absolute inset-0 opacity-[0.15] z-30 pointer-events-none" style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '60px 60px' }}></div>
-      </div>
-
-      <header className="shrink-0 h-16 sm:h-20 px-4 sm:px-10 flex items-center justify-between border-b border-white/5 bg-black/20 backdrop-blur-3xl relative z-[60]">
-        <div className="flex items-center gap-6">
-          <div onClick={() => router.back()} className="cursor-pointer group flex items-center gap-4">
-            <div className="w-9 h-9 bg-red-600/80 border border-white/20 rounded-xl shadow-xl group-hover:scale-110 transition-all flex items-center justify-center text-white relative overflow-hidden">
-              <svg className="w-4 h-4 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[8px] font-black text-blue-400 uppercase tracking-[0.4em] leading-none mb-0.5 opacity-70">Encyclopedia</span>
-              <h1 className="text-lg sm:text-xl font-mono text-white uppercase font-black tracking-tighter leading-none">{regionName} Sector</h1>
-            </div>
-          </div>
+    <div className="lab-dex lab-width">
+      <header className="lab-page-heading">
+        <div className="lab-dex-title">
+          <Link href="/" aria-label={t('Back')} className="lab-dex-back">←</Link>
+          <h1 className="lab-route-title">{t("{{region}} Pokédex", { region: regionTitle ? t(regionTitle) : regionName })}</h1>
         </div>
-        <div className="flex items-center gap-4 flex-1 justify-end">
-          <div className="relative group/search hidden md:block max-w-[200px] lg:max-w-[280px] w-full mr-2">
-            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-white/20 group-focus-within/search:text-blue-400 transition-colors">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            </div>
-            <input
-              type="text"
-              value={pokemonSearchTerm}
-              onChange={(e) => setPokemonSearchTerm(e.target.value)}
-              placeholder={t('Search...')}
-              className="w-full bg-black/20 border border-white/10 rounded-xl pl-10 pr-4 py-1.5 font-sans text-xs text-white placeholder:text-white/20 focus:border-blue-500/50 outline-none transition-all backdrop-blur-md"
-            />
-          </div>
-          <button onClick={() => { setSelectedPlayer(null); setSelectedPlayer2(null); setSelectedOpponent(null); setSelectedOpponent2(null); setPlayerPokemon(null); setPlayerPokemon2(null); setOpponentPokemon(null); setOpponentPokemon2(null); setPokemonSearchTerm(''); }} className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white/40 hover:text-white font-mono font-black text-[9px] uppercase transition-all rounded-lg backdrop-blur-md">Reset</button>
+        <LanguageSwitcher />
+        <div className="lab-dex-search">
+          <input type="search" aria-label={t("Search Pokémon")} placeholder={t("Search Pokémon")} value={pokemonSearchTerm} onChange={(event) => setPokemonSearchTerm(event.target.value)} />
+          <button onClick={() => { setSelectedPlayer(null); setSelectedPlayer2(null); setSelectedOpponent(null); setSelectedOpponent2(null); setPlayerPokemon(null); setPlayerPokemon2(null); setOpponentPokemon(null); setOpponentPokemon2(null); setPokemonSearchTerm(''); }} className="lab-button lab-button-outline">{t("Reset team")}</button>
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden relative z-10">
+      <main className="lab-dex-main">
         {/* P1 상세 */}
         {selectedPlayer && showP1Info && (
-          <div className={`lg:shrink-0 h-full ${(typeof window !== 'undefined' && window.innerWidth < 1024) ? 'fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-end lg:items-center justify-center' : 'relative z-40 flex flex-col justify-center'}`}>
+          <div className="lab-dex-detail">
             <div className="absolute inset-0 lg:hidden" onClick={() => setShowP1Info(false)}></div>
             <div className="w-full lg:w-auto h-full transform transition-transform duration-500 ease-out animate-in slide-in-from-bottom lg:slide-in-from-left">
               <PokedexSidePanel
@@ -353,7 +334,7 @@ export default function RegionPage() {
 
         {/* P1-2 상세 */}
         {selectedPlayer2 && showP1Info2 && (
-          <div className={`lg:shrink-0 h-full ${(typeof window !== 'undefined' && window.innerWidth < 1024) ? 'fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-end lg:items-center justify-center' : 'relative z-40 flex flex-col justify-center'}`}>
+          <div className="lab-dex-detail">
             <div className="absolute inset-0 lg:hidden" onClick={() => setShowP1Info2(false)}></div>
             <div className="w-full lg:w-auto h-full transform transition-transform duration-500 ease-out animate-in slide-in-from-bottom lg:slide-in-from-left">
               <PokedexSidePanel
@@ -374,60 +355,41 @@ export default function RegionPage() {
         )}
 
         {/* 중앙 그리드 */}
-        <div ref={mainScrollRef} className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar relative">
-          {loading ? (
-            <div className="h-full flex flex-col items-center justify-center gap-8 relative z-50">
-              <div className="relative w-24 h-24 sm:w-32 sm:h-32 animate-spin" style={{ animationDuration: '1.5s' }}>
-                <div className="w-full h-full rounded-full border-[6px] border-black bg-gradient-to-b from-red-500 from-50% to-white to-50% flex items-center justify-center overflow-hidden shadow-[0_0_40px_rgba(239,68,68,0.5)]">
-                  <div className="w-full h-3 sm:h-4 bg-black absolute top-1/2 -translate-y-1/2"></div>
-                  <div className="w-8 h-8 sm:w-12 sm:h-12 bg-white border-[5px] sm:border-[6px] border-black rounded-full absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center z-10">
-                    <div className="w-2.5 h-2.5 sm:w-4 sm:h-4 bg-red-500 border-2 border-black rounded-full animate-pulse shadow-[0_0_10px_#ef4444]"></div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-col items-center w-64 sm:w-80 gap-3">
-                <div className="flex justify-between w-full px-2">
-                  <p className="text-xs sm:text-sm font-mono text-white uppercase font-black tracking-[0.2em] animate-pulse">Syncing Data...</p>
-                  <p className="text-xs sm:text-sm font-mono text-blue-400 font-black">{loadingProgress}%</p>
-                </div>
-                <div className="w-full bg-black/60 border border-white/20 rounded-full h-4 sm:h-5 overflow-hidden shadow-inner p-0.5 sm:p-1">
-                  <div className="h-full bg-gradient-to-r from-blue-600 to-blue-400 transition-all duration-300 ease-out rounded-full relative overflow-hidden" style={{ width: `${loadingProgress}%` }}>
-                     <div className="absolute inset-0 w-full h-full bg-[linear-gradient(45deg,rgba(255,255,255,0.2)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.2)_50%,rgba(255,255,255,0.2)_75%,transparent_75%,transparent)] bg-[length:20px_20px] animate-stripe-scroll"></div>
-                  </div>
-                </div>
-              </div>
+        <div ref={mainScrollRef} className="lab-dex-scroll">
+          {failedRegion === regionName ? (
+            <div className="flex h-full flex-col items-center justify-center gap-4 text-center" role="alert">
+              <p>{t('Could not load the Pokédex.')}</p>
+              <button type="button" className="lab-button lab-button-primary" onClick={() => {
+                setFailedRegion(null);
+                setLoadAttempt((attempt) => attempt + 1);
+              }}>{t('Retry')}</button>
             </div>
+          ) : !entries ? (
+            <p className="flex h-full items-center justify-center text-sm font-bold" role="status">{t('Loading Pokédex…')}</p>
           ) : (
-            <div className={`grid gap-3 sm:gap-4 transition-all duration-700 ${(selectedPlayer && selectedOpponent) ? 'grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-4 xl:grid-cols-5' : (selectedPlayer || selectedOpponent) ? 'grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-6 xl:grid-cols-7' : 'grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10'}`}>
+            <div className="lab-dex-grid">
               {entries.filter(entry => {
                 const name = localizedNames[entry.pokemon_species.name] || entry.pokemon_species.name;
                 return matchChosung(name, pokemonSearchTerm);
               }).map((entry, idx) => {
                 const id = entry.pokemon_species.url.split('/').filter(Boolean).pop();
-                const isP1 = selectedPlayer?.name === entry.pokemon_species.name;
-                const isP2 = selectedOpponent?.name === entry.pokemon_species.name;
+                const isP1 = [selectedPlayer, selectedPlayer2].some((pokemon) => pokemon?.name === entry.pokemon_species.name);
+                const isP2 = [selectedOpponent, selectedOpponent2].some((pokemon) => pokemon?.name === entry.pokemon_species.name);
                 const displayName = localizedNames[entry.pokemon_species.name] || entry.pokemon_species.name;
 
                 return (
-                  <div
+                  <button
                     key={entry.pokemon_species.name}
+                    type="button"
                     onClick={() => handleSelect(entry)}
-                    style={{ animationDelay: `${(idx % 20) * 40}ms` }}
-                    className={`group relative p-0.5 rounded-[1.2rem] cursor-pointer transition-all duration-500 animate-in fade-in zoom-in-90 fill-mode-both 
-                      ${isP1 && isP2 ? 'bg-gradient-to-br from-blue-500 to-red-600 scale-95 shadow-[0_0_20px_rgba(255,255,255,0.2)]' : isP1 ? 'bg-blue-500 scale-95 shadow-[0_0_15px_rgba(59,130,246,0.4)]' : isP2 ? 'bg-red-600 scale-95 shadow-[0_0_15px_rgba(220,38,38,0.4)]' : 'bg-white/5 hover:bg-white/10 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.4)] active:scale-95'}`}
+                    className="lab-dex-card"
+                    data-player={isP1}
+                    data-opponent={isP2}
                   >
-                    <div className="bg-[#1a1a1a]/40 backdrop-blur-md border border-white/5 rounded-[1rem] p-2 sm:p-3 flex flex-col items-center relative overflow-hidden h-full min-h-[100px] sm:min-h-[140px] justify-center">
-                      <div className="absolute top-1.5 right-2 text-[8px] font-mono text-white/10 font-black">#{String(id).padStart(3, '0')}</div>
-                      {(isP1 || isP2) && (
-                        <div className="absolute top-1.5 left-2 flex gap-1">
-                          {isP1 && <div className="w-2 h-2 rounded-full bg-blue-400 shadow-[0_0_8px_#3b82f6]"></div>}
-                          {isP2 && <div className="w-2 h-2 rounded-full bg-red-400 shadow-[0_0_8px_#dc2626]"></div>}
-                        </div>
-                      )}
-                      <img src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`} className={`w-16 h-16 sm:w-20 sm:h-20 transition-transform duration-500 relative z-10 ${isP1 || isP2 ? 'scale-110' : 'group-hover:scale-125'}`} style={{ imageRendering: 'pixelated' }} />
-                      <h3 className={`mt-1 sm:mt-2 font-sans font-black text-[10px] sm:text-xs uppercase truncate w-full text-center tracking-tight transition-colors ${isP1 || isP2 ? 'text-white' : 'text-white/60 group-hover:text-white'}`}>{displayName}</h3>
-                    </div>
-                  </div>
+                    <span>#{String(id).padStart(3, "0")}</span>
+                    <img src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`} alt="" width={68} height={68} loading={idx < 20 ? "eager" : "lazy"} />
+                    <strong>{displayName}</strong>
+                  </button>
                 );
               })}
             </div>
@@ -436,7 +398,7 @@ export default function RegionPage() {
 
         {/* P2 상세 */}
         {selectedOpponent && showP2Info && (
-          <div className={`lg:shrink-0 h-full ${(typeof window !== 'undefined' && window.innerWidth < 1024) ? 'fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-end lg:items-center justify-center' : 'relative z-40 flex flex-col justify-center'}`}>
+          <div className="lab-dex-detail">
             <div className="absolute inset-0 lg:hidden" onClick={() => setShowP2Info(false)}></div>
             <div className="w-full lg:w-auto h-full transform transition-transform duration-500 ease-out animate-in slide-in-from-bottom lg:slide-in-from-right">
               <PokedexSidePanel
@@ -459,7 +421,7 @@ export default function RegionPage() {
 
         {/* P2-2 상세 */}
         {selectedOpponent2 && showP2Info2 && (
-          <div className={`lg:shrink-0 h-full ${(typeof window !== 'undefined' && window.innerWidth < 1024) ? 'fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-end lg:items-center justify-center' : 'relative z-40 flex flex-col justify-center'}`}>
+          <div className="lab-dex-detail">
             <div className="absolute inset-0 lg:hidden" onClick={() => setShowP2Info2(false)}></div>
             <div className="w-full lg:w-auto h-full transform transition-transform duration-500 ease-out animate-in slide-in-from-bottom lg:slide-in-from-right">
               <PokedexSidePanel
@@ -481,8 +443,8 @@ export default function RegionPage() {
         )}
       </main>
 
-      <footer className="shrink-0 p-4 flex flex-col sm:flex-row justify-center items-center gap-4 z-[50] relative">
-        <div className="flex flex-col gap-2 items-center mr-4">
+      <footer className="lab-team-dock">
+        <div className="lab-team-modes flex flex-wrap gap-2 items-center">
           <div className="flex bg-black/50 p-1 rounded-xl border border-white/20 gap-2">
             <div className="flex">
               <button onClick={() => setBattleMode('1v1')} className={`px-2 sm:px-3 py-1 rounded-l-lg text-[10px] sm:text-xs font-mono font-black uppercase transition-all border-r border-white/10 ${battleMode === '1v1' ? 'bg-blue-500 text-white' : 'text-white/40 hover:text-white'}`}>1v1</button>
@@ -514,43 +476,37 @@ export default function RegionPage() {
           </div>
         </div>
 
-        <div className="w-full max-w-4xl flex items-center gap-6 relative z-10">
-          <div className="flex-1 flex justify-around items-center bg-black/40 backdrop-blur-xl border-2 border-black p-2 rounded-[1.5rem] shadow-2xl relative">
-            <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-[#DC0A2D] border-2 border-black px-3 py-0.5 rounded-full z-10 shadow-lg"><span className="text-[7px] font-mono text-white font-black tracking-[0.3em] uppercase whitespace-nowrap">READY</span></div>
-            
-            <div className="flex items-center gap-3">
-              <div onClick={() => selectedPlayer && togglePanel('p1')} className={`w-12 h-12 rounded-xl border-2 transition-all flex items-center justify-center relative cursor-pointer ${selectedPlayer ? 'bg-blue-500/20 border-blue-500/50' : 'bg-white/5 border-white/5 border-dashed opacity-40'}`}>
-                {selectedPlayer && <img src={selectedPlayer.sprites.front_default} className="w-14 h-14 max-w-none absolute drop-shadow-lg animate-float" style={{ imageRendering: 'pixelated' }} />}
+        <div className="lab-team-actions">
+          <div className="lab-team-slots">
+            <div className="lab-team-side">
+              <span>{t('Player 1')}</span>
+              <div className="lab-team-lineup">
+                <TeamSlot pokemon={selectedPlayer} label={selectedPlayer ? getLocalizedName(playerSpecies, selectedPlayer.name) : t('Player 1')} onClick={() => togglePanel('p1')} />
+                {battleMode === '2v2' && (
+                  <TeamSlot pokemon={selectedPlayer2} label={selectedPlayer2 ? getLocalizedName(playerSpecies2, selectedPlayer2.name) : t('Player 1')} onClick={() => togglePanel('p1_2')} />
+                )}
               </div>
-              {battleMode === '2v2' && (
-                <div onClick={() => selectedPlayer2 && togglePanel('p1_2')} className={`w-12 h-12 rounded-xl border-2 transition-all flex items-center justify-center relative cursor-pointer ${selectedPlayer2 ? 'bg-blue-500/20 border-blue-500/50' : 'bg-white/5 border-white/5 border-dashed opacity-40'}`}>
-                  {selectedPlayer2 && <img src={selectedPlayer2.sprites.front_default} className="w-14 h-14 max-w-none absolute drop-shadow-lg animate-float" style={{ imageRendering: 'pixelated' }} />}
-                </div>
-              )}
             </div>
 
-            <div className="text-xl font-mono text-white/10 font-black italic tracking-tighter">VS</div>
+            <span className="lab-team-versus" aria-hidden="true">VS</span>
 
-            <div className="flex items-center gap-3">
-              {(!isTournament && !isVsAI) ? (
-                <>
-                  {battleMode === '2v2' && (
-                    <div onClick={() => selectedOpponent2 && togglePanel('p2_2')} className={`w-12 h-12 rounded-xl border-2 transition-all flex items-center justify-center relative cursor-pointer ${selectedOpponent2 ? 'bg-red-500/20 border-red-500/50' : 'bg-white/5 border-white/5 border-dashed opacity-40'}`}>
-                      {selectedOpponent2 && <img src={selectedOpponent2.sprites.front_default} className="w-14 h-14 max-w-none absolute drop-shadow-lg animate-float" style={{ imageRendering: 'pixelated' }} />}
-                    </div>
-                  )}
-                  <div onClick={() => selectedOpponent && togglePanel('p2')} className={`w-12 h-12 rounded-xl border-2 transition-all flex items-center justify-center relative cursor-pointer ${selectedOpponent ? 'bg-red-500/20 border-red-500/50' : 'bg-white/5 border-white/5 border-dashed opacity-40'}`}>
-                    {selectedOpponent && <img src={selectedOpponent.sprites.front_default} className="w-14 h-14 max-w-none absolute drop-shadow-lg animate-float" style={{ imageRendering: 'pixelated' }} />}
-                  </div>
-                </>
-              ) : (
-                <div className="w-12 h-12 rounded-xl border-2 bg-red-500/10 border-red-500/30 flex items-center justify-center relative">
-                  <span className="text-xs font-mono font-black text-red-400 text-center leading-none">CPU<br/><span className="text-[8px]">AUTO</span></span>
-                </div>
-              )}
+            <div className="lab-team-side lab-team-rival">
+              <span>{!isTournament && !isVsAI ? t('Player 2') : 'CPU'}</span>
+              <div className="lab-team-lineup">
+                {!isTournament && !isVsAI ? (
+                  <>
+                    <TeamSlot pokemon={selectedOpponent} label={selectedOpponent ? getLocalizedName(opponentSpecies, selectedOpponent.name) : t('Player 2')} onClick={() => togglePanel('p2')} />
+                    {battleMode === '2v2' && (
+                      <TeamSlot pokemon={selectedOpponent2} label={selectedOpponent2 ? getLocalizedName(opponentSpecies2, selectedOpponent2.name) : t('Player 2')} onClick={() => togglePanel('p2_2')} />
+                    )}
+                  </>
+                ) : (
+                  <span className="lab-team-slot lab-team-cpu">AI</span>
+                )}
+              </div>
             </div>
           </div>
-          
+
           <button onClick={async () => {
             const team1 = []; const moves1 = [];
             if (selectedPlayer) { team1.push(playerPokemon); moves1.push(playerMoves); }
@@ -561,18 +517,29 @@ export default function RegionPage() {
             if (isTournament) {
               setPlayerTeam(team1);
               setPlayerTeamMoves(moves1);
+              setTournamentMatches([]);
+              setCurrentMatchId(null);
               router.push('/tournament');
               return;
             }
 
             if (isVsAI) {
-              // Auto generate AI opponents
-              for (let i = 0; i < (battleMode === '2v2' ? 2 : 1); i++) {
-                const randomId = Math.floor(Math.random() * 898) + 1;
-                const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${randomId}`);
-                const data = await res.json();
-                team2.push(data);
-                moves2.push(await getRandomMoves(data.moves, 4));
+              if (launching) return;
+              setLaunching(true);
+              setLaunchFailed(false);
+              try {
+                const teamSize = battleMode === '2v2' ? 2 : 1;
+                const opponents = await Promise.all(Array.from({ length: teamSize }, async () => {
+                  const pokemon = await getPokemon(Math.floor(Math.random() * 898) + 1);
+                  return { pokemon, moves: await getRandomMoves(pokemon.moves, 4) };
+                }));
+                team2.push(...opponents.map(({ pokemon }) => pokemon));
+                moves2.push(...opponents.map(({ moves }) => moves));
+              } catch {
+                setLaunchFailed(true);
+                return;
+              } finally {
+                setLaunching(false);
               }
             } else {
               if (selectedOpponent) { team2.push(opponentPokemon); moves2.push(opponentMoves); }
@@ -592,13 +559,14 @@ export default function RegionPage() {
             
             router.push('/battle');
             
-          }} disabled={!selectedPlayer || (battleMode === '2v2' && !selectedPlayer2) || (!isTournament && !isVsAI && !selectedOpponent) || (!isTournament && !isVsAI && battleMode === '2v2' && !selectedOpponent2)} className="group relative px-6 sm:px-8 py-2 sm:py-3 bg-yellow-400 border-[4px] border-black rounded-[1.5rem] shadow-xl hover:-translate-y-1 active:translate-y-0.5 disabled:opacity-20 transition-all overflow-hidden flex-shrink-0">
-            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform"></div>
-            <span className="relative z-10 text-sm sm:text-lg font-mono font-black text-black uppercase italic tracking-tighter">
-              {isTournament ? 'Enter Tourney' : t('Battle')}
+          }} disabled={launching || !selectedPlayer || (battleMode === '2v2' && !selectedPlayer2) || (!isTournament && !isVsAI && !selectedOpponent) || (!isTournament && !isVsAI && battleMode === '2v2' && !selectedOpponent2)} className="lab-button lab-team-launch">
+            <span aria-hidden="true">▶</span>
+            <span>
+              {launching ? t('Preparing battle…') : launchFailed ? t('Retry') : isTournament ? t('Enter tournament') : t('Start Battle!')}
             </span>
           </button>
         </div>
+        {launchFailed && <p role="alert" className="text-sm text-red-300">{t('Could not prepare the battle.')}</p>}
       </footer>
 
       {isMoveModalOpen && editingPlayer && (

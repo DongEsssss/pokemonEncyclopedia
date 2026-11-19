@@ -1,5 +1,6 @@
 import React from 'react';
 import { typeThemes } from '../constants/pokemon';
+import PokemonRelease from './PokemonRelease';
 
 interface PokedexSidePanelProps {
   pokemon: any;
@@ -30,33 +31,12 @@ const PokedexSidePanel = ({
   getLocalizedPokemonDescription,
   getLocalizedMoveName
 }: PokedexSidePanelProps) => (
-  <div className={`w-full lg:w-[340px] xl:w-[380px] h-[80vh] lg:h-[calc(100%-2rem)] flex flex-col bg-[#1a1a1a]/95 backdrop-blur-3xl border-[6px] border-black shadow-[0_0_120px_rgba(0,0,0,0.9)] overflow-hidden transition-all duration-1000 cubic-bezier(0.34, 1.56, 0.64, 1) animate-in fade-in zoom-in-95 ${isOpponent ? 'lg:slide-in-from-right-full' : 'lg:slide-in-from-left-full'} z-40 rounded-[2.5rem] lg:m-4 relative min-h-0`}>
-    {/* 기기 외관 광택 및 질감 */}
-    <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-black/60 pointer-events-none"></div>
-    <div className="absolute inset-0 opacity-[0.03] bg-[url('https://www.transparenttextures.com/patterns/brushed-alum.png')] pointer-events-none"></div>
-
-    {/* 장치 헤더: 부드럽게 아래로 내려오는 애니메이션 */}
-    <div className={`p-4 flex items-center justify-between border-b-[6px] border-black shrink-0 relative overflow-hidden bg-[#DC0A2D] animate-in slide-in-from-top duration-700 delay-300 fill-mode-both`}>
-      <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent pointer-events-none"></div>
-      <div className="flex items-center gap-3 relative z-10">
-        <div className="w-10 h-10 rounded-full border-4 border-white shadow-[0_0_20px_rgba(255,255,255,0.5)] flex items-center justify-center bg-[#28aafd] animate-pulse">
-          <div className="w-6 h-6 rounded-full bg-[#88d6ff] opacity-80 shadow-inner"></div>
-        </div>
-        <div className="flex flex-col">
-          <span className="text-[8px] font-black text-white/70 uppercase tracking-widest leading-none">SYSTEM.READY</span>
-          <span className="text-white font-mono font-black text-sm uppercase tracking-tighter">{isOpponent ? '2PLAYER' : '1PLAYER'}</span>
-        </div>
-      </div>
-      <div className="flex gap-1.5 relative z-10">
-        <div className="w-2.5 h-2.5 rounded-full bg-[#ff0000] border border-black/40 shadow-sm"></div>
-        <div className="w-2.5 h-2.5 rounded-full bg-[#ffcc00] border border-black/40 shadow-sm"></div>
-        <div className="w-2.5 h-2.5 rounded-full bg-[#33cc33] border border-black/40 shadow-sm"></div>
-      </div>
-      <button onClick={onClose} className="ml-4 w-8 h-8 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center text-sm font-bold transition-all active:scale-90 relative z-10 border border-white/10">✕</button>
-    </div>
-
-    {/* 탭 영역: 페이드 인 애니메이션 */}
-    <div className="px-4 pt-4 shrink-0 relative z-10 animate-in fade-in duration-700 delay-500 fill-mode-both">
+  <div className="lab-dex-panel">
+    <header className="lab-dex-panel-header">
+      <h2>{t(isOpponent ? 'Player 2' : 'Player 1')}</h2>
+      <button type="button" onClick={onClose} className="lab-dex-close" aria-label={t('Close')}>&times;</button>
+    </header>
+    <div className="px-4 pt-4 shrink-0 relative">
       <div className="flex bg-black/60 p-1.5 rounded-2xl gap-1 border-2 border-black shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]">
         <button onClick={() => onTabChange('info')} className={`flex-1 py-2.5 font-mono text-[11px] uppercase font-black rounded-xl transition-all duration-500 ${tab === 'info' ? 'bg-[#28aafd] text-white shadow-[0_0_15px_rgba(40,170,253,0.5)]' : 'text-white/30 hover:text-white/60'}`}>{t('정보')}</button>
         <button onClick={() => onTabChange('moves')} className={`flex-1 py-2.5 font-mono text-[11px] uppercase font-black rounded-xl transition-all duration-500 ${tab === 'moves' ? 'bg-[#28aafd] text-white shadow-[0_0_15px_rgba(40,170,253,0.5)]' : 'text-white/30 hover:text-white/60'}`}>{t('스킬셋')}</button>
@@ -64,20 +44,16 @@ const PokedexSidePanel = ({
     </div>
 
     <div className="flex-1 flex flex-col min-h-0 relative z-10">
-      <div className="flex-1 p-4 sm:p-5 overflow-y-auto custom-scrollbar bg-[#1a1a1a] min-h-0">
+      <div className="flex-1 p-4 sm:p-5 overflow-y-auto custom-scrollbar bg-transparent min-h-0">
         {/* 공통 상단 영역: 중앙에서 커지며 나타나는 애니메이션 */}
-        <div className="mb-4 animate-in fade-in zoom-in-75 duration-700 delay-700 fill-mode-both">
+        <div className="mb-4">
           <div className="relative bg-black/60 border-[4px] border-black rounded-[2rem] p-6 flex flex-col items-center justify-center overflow-hidden shadow-[inset_0_0_40px_rgba(0,0,0,0.8)]">
             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 pointer-events-none"></div>
             <div className="absolute top-3 left-4 text-[9px] font-mono text-blue-400/30 font-black tracking-widest uppercase">ID.UNIT_{String(pokemon.id).padStart(4, '0')}</div>
             
             <div className="relative group/sprite">
               <div className="absolute inset-0 bg-blue-500/20 blur-3xl rounded-full scale-150 opacity-0 group-hover/sprite:opacity-100 transition-opacity duration-700"></div>
-              <img 
-                src={pokemon.sprites.front_default} 
-                className="w-32 h-32 relative drop-shadow-[0_0_30px_rgba(40,170,253,0.4)] animate-float-slow hover:scale-110 transition-transform duration-500" 
-                style={{ imageRendering: 'pixelated' }} 
-              />
+              <PokemonRelease key={pokemon.id} src={pokemon.sprites.front_default} size={128} />
             </div>
 
             <h2 className="text-xl font-mono text-white uppercase font-black tracking-tighter text-center mt-2">{getLocalizedName(species, pokemon.name)}</h2>
