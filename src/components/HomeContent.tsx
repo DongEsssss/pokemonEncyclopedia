@@ -110,7 +110,7 @@ export default function HomeContent() {
           <section className={styles.feature} aria-labelledby="region-title">
             <div className={styles.stage}>
               <div className={styles.map}>
-                <Image src={selectedRegion.bgUrl} alt={t('{{region}} map', { region: t(selectedRegion.nameKey) })} fill sizes="(max-width: 760px) 100vw, 780px" />
+                <Image src={selectedRegion.bgUrl} alt={t('{{region}} map', { region: t(selectedRegion.nameKey) })} fill sizes="(max-width: 680px) 100vw, (max-width: 1360px) 60vw, 770px" />
               </div>
               <div className={styles.stageContent}>
                 <div className={styles.starters} aria-hidden="true">

@@ -30,7 +30,7 @@ npm run build  # 프로덕션 빌드
 
 <table align="center">
   <tr>
-    <td align="center"><b>배틀 메뉴</b><br/><img src="public/screenshots/home.png" width="400"/></td>
+    <td align="center"><b>포켓몬 도감 홈</b><br/><img src="public/screenshots/home.png" width="400"/></td>
     <td align="center"><b>지역 도감과 팀 편성</b><br/><img src="public/screenshots/region.png" width="400"/></td>
   </tr>
   <tr>

@@ -257,6 +257,7 @@ button:not(:disabled) { cursor: pointer; }
 .lab-home-footer { border-top: 1px solid var(--lab-border); margin-top: 1.5rem; padding-top: 1rem; color: var(--lab-muted); font-size: 0.78rem; }
 
 .lab-dex {
+  width: min(100% - 1.5rem, 86rem);
   height: max(36rem, calc(100dvh - 1.5rem));
   margin-block: 0.75rem;
   display: flex;
