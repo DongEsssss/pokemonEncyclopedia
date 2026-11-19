@@ -10,9 +10,21 @@ import {
 
 const API_BASE = 'https://pokeapi.co/api/v2';
 
+function requestSignal(signal?: AbortSignal) {
+  const timeout = AbortSignal.timeout(10_000);
+  return signal ? AbortSignal.any([signal, timeout]) : timeout;
+}
+
+export async function getPokedexEntries(id: number, signal?: AbortSignal): Promise<PokedexEntry[]> {
+  const response = await fetch(`${API_BASE}/pokedex/${id}`, { signal: requestSignal(signal) });
+  if (!response.ok) throw new Error('Failed to fetch Pokédex entries');
+  const data = await response.json();
+  return data.pokemon_entries;
+}
+
 // 포켓몬 종(Species) 정보 가져오기
-export async function getPokemonSpecies(nameOrId: string | number): Promise<PokemonSpecies> {
-  const res = await fetch(`${API_BASE}/pokemon-species/${nameOrId}`);
+export async function getPokemonSpecies(nameOrId: string | number, signal?: AbortSignal): Promise<PokemonSpecies> {
+  const res = await fetch(`${API_BASE}/pokemon-species/${nameOrId}`, { signal: requestSignal(signal) });
   if (!res.ok) throw new Error('Failed to fetch pokemon species details');
   return await res.json();
 }
@@ -44,14 +56,14 @@ export async function getPokedexByRegion(regionName: string): Promise<PokedexEnt
 }
 
 // 포켓몬 상세 정보 가져오기
-export async function getPokemon(nameOrId: string | number): Promise<Pokemon> {
-  const res = await fetch(`${API_BASE}/pokemon/${nameOrId}`);
+export async function getPokemon(nameOrId: string | number, signal?: AbortSignal): Promise<Pokemon> {
+  const res = await fetch(`${API_BASE}/pokemon/${nameOrId}`, { signal: requestSignal(signal) });
   if (!res.ok) throw new Error('Failed to fetch pokemon details');
   return await res.json();
 }
 
 // 랜덤한 기술 목록 가져오기
-export async function getRandomMoves(movesList: PokemonMove[], count: number = 4): Promise<MoveDetails[]> {
+export async function getRandomMoves(movesList: PokemonMove[], count: number = 4, signal?: AbortSignal): Promise<MoveDetails[]> {
   if (!movesList || movesList.length === 0) return [];
   
   const shuffled = [...movesList].sort(() => 0.5 - Math.random());
@@ -62,18 +74,19 @@ export async function getRandomMoves(movesList: PokemonMove[], count: number = 4
   const candidates = shuffled.slice(0, 15);
   const fetchPromises = candidates.map(async (item) => {
     try {
-      const res = await fetch(item.move.url);
+      const res = await fetch(item.move.url, { signal: requestSignal(signal) });
       if (res.ok) {
         const data: MoveDetails = await res.json();
         return data;
       }
     } catch (e) {
-      console.error(e);
+      if (!signal?.aborted) console.error(e);
     }
     return null;
   });
 
   const results = await Promise.all(fetchPromises);
+  signal?.throwIfAborted();
   for (const data of results) {
     if (data && data.power && data.power > 0) {
       selectedMoves.push(data);
@@ -134,20 +147,21 @@ export async function getMovesDetails(urls: string[]): Promise<MoveDetails[]> {
 }
 
 // 특정 이름의 기술 정보들을 가져오기 (고정 스킬셋 등)
-export async function getFixedMovesDetailsByNames(names: string[]): Promise<MoveDetails[]> {
+export async function getFixedMovesDetailsByNames(names: string[], signal?: AbortSignal): Promise<MoveDetails[]> {
   const fetchPromises = names.map(async (name) => {
     try {
-      const res = await fetch(`${API_BASE}/move/${name}`);
+      const res = await fetch(`${API_BASE}/move/${name}`, { signal: requestSignal(signal) });
       if (res.ok) {
         const data: MoveDetails = await res.json();
         return data;
       }
     } catch (e) {
-      console.error(e);
+      if (!signal?.aborted) console.error(e);
     }
     return null;
   });
 
   const results = await Promise.all(fetchPromises);
+  signal?.throwIfAborted();
   return results.filter((m): m is MoveDetails => m !== null);
 }

@@ -17,34 +17,7 @@ export const getMultiplier = (attackType: string, defenderTypes: string[]) => {
 };
 
 
-/**
- * 데미지를 계산합니다.
- * @param power 기술 위력
- * @param attackerAtk 공격자 공격력
- * @param defenderDef 방어자 방어력
- * @param multiplier 타입 배율
- * @param isStab 자속 보정 여부 (Same Type Attack Bonus)
- * @returns 최종 데미지
- */
-export const calculateDamage = (
-  power: number,
-  attackerAtk: number,
-  defenderDef: number,
-  multiplier: number,
-  isStab: boolean = false,
-  attackerStatus: string | null = null,
-  isPhysical: boolean = true
-) => {
-  const stabBonus = isStab ? 1.5 : 1;
-  let damage = ((power * attackerAtk / defenderDef) / 2) * multiplier * stabBonus;
-  
-  // 화상(BRN) 상태이고 물리 공격일 경우 데미지 절반 감소
-  if (attackerStatus === 'BRN' && isPhysical) {
-    damage *= 0.5;
-  }
-  
-  return Math.max(1, Math.floor(damage));
-};
+export { calculateDamage } from './battleRules';
 
 /**
  * 포켓몬의 특정 스탯 값을 가져옵니다.
